@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const ML_BASE_URL = "http://localhost:8000"
+const ML_BASE_URL = "https://cropintel-hub-ml.onrender.com"
 
 const getPriceForecast = async (days) => {
   try {

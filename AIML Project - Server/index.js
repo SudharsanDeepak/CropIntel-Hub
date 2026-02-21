@@ -8,7 +8,7 @@ const connectDB = require("./config/db");
 const Sales = require("./models/Sales");
 const app = express();
 const PORT = process.env.PORT || 5000;
-const ML_API = process.env.ML_API || "http://localhost:8000"
+const ML_API = process.env.ML_API || "https://cropintel-hub-ml.onrender.com"
 
 app.use(cors({
   origin: [

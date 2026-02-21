@@ -3,7 +3,7 @@ const axios = require('axios');
 const Alert = require('../models/Alert');
 const { sendPriceAlertEmail } = require('./priceAlertService');
 
-const ML_API = process.env.ML_API || 'http://localhost:8000'
+const ML_API = process.env.ML_API || 'https://cropintel-hub-ml.onrender.com'
 
 const checkPriceAlerts = async () => {
   try {

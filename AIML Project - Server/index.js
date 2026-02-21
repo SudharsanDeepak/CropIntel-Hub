@@ -189,9 +189,10 @@ const startServer = async () => {
     await connectDB();
     app.listen(PORT, () => {
       console.log("========================================");
-      console.log(`🚀 Node API running at http:
+      console.log(`🚀 Node API running at http://localhost:${PORT}`);
       console.log(`🧠 ML Service connected at ${ML_API}`);
       console.log("========================================");
+      
       const { startPriceMonitoring } = require('./services/priceMonitor');
       startPriceMonitoring();
     });

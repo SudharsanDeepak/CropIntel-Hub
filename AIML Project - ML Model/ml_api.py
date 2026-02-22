@@ -70,19 +70,13 @@ async def startup_event():
     print("🚀 ML API STARTING UP")
     print("=" * 60)
     
-    print("\n📊 Fetching initial market data...")
-    try:
-        from data_sources.alternative_fetcher import AlternativeMarketDataFetcher
-        alt_fetcher = AlternativeMarketDataFetcher()
-        saved_count = alt_fetcher.update_market_data(days=30)
-        print(f"✅ Loaded {saved_count} records from market simulation")
-    except Exception as e:
-        print(f"❌ Initial data load failed: {str(e)}")
-    
     print("\n🔄 Starting automatic data update scheduler (every 24 hours)...")
     update_thread = threading.Thread(target=auto_update_data, daemon=True)
     update_thread.start()
     print("✅ Scheduler started")
+    
+    print("\n📊 Initial data population will happen in background...")
+    print("💡 Use /data/populate endpoint to populate data manually")
     
     print("\n" + "=" * 60)
     print("✅ ML API READY")

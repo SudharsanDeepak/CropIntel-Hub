@@ -162,10 +162,11 @@ def stock(days: int = 7):
 def elasticity():
     data = calculate_elasticity()
     return data.to_dict(orient="records")
-@app.post("/data/update")
+@app.get("/data/update")
 def update_market_data():
     """
     Manually trigger market data update from external APIs.
+    Can be called from browser to fetch fresh data.
     """
     try:
         from data_sources.api_fetcher import MarketDataFetcher

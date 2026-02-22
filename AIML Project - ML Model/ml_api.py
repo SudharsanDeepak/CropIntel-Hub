@@ -39,12 +39,27 @@ def auto_update_data():
         try:
             print(f"\n⏰ Auto-update triggered at {datetime.now()}")
             from data_sources.api_fetcher import MarketDataFetcher
+            from data_sources.alternative_fetcher import AlternativeMarketDataFetcher
+            
             fetcher = MarketDataFetcher()
             records = fetcher.fetch_all_products()
             saved_count = fetcher.save_to_mongodb(records)
+            
+            if saved_count == 0:
+                print("⚠️  External APIs failed, using alternative data source...")
+                alt_fetcher = AlternativeMarketDataFetcher()
+                saved_count = alt_fetcher.update_market_data(days=7)
+            
             print(f"✅ Auto-updated {saved_count} records")
         except Exception as e:
             print(f"❌ Auto-update error: {str(e)}")
+            try:
+                print("🔄 Falling back to alternative data source...")
+                from data_sources.alternative_fetcher import AlternativeMarketDataFetcher
+                alt_fetcher = AlternativeMarketDataFetcher()
+                alt_fetcher.update_market_data(days=7)
+            except Exception as fallback_error:
+                print(f"❌ Fallback also failed: {str(fallback_error)}")
         
         time.sleep(24 * 60 * 60)
 
@@ -55,13 +70,19 @@ async def startup_event():
     print("🚀 ML API STARTING UP")
     print("=" * 60)
     
+    print("\n📊 Fetching initial market data...")
+    try:
+        from data_sources.alternative_fetcher import AlternativeMarketDataFetcher
+        alt_fetcher = AlternativeMarketDataFetcher()
+        saved_count = alt_fetcher.update_market_data(days=30)
+        print(f"✅ Loaded {saved_count} records from market simulation")
+    except Exception as e:
+        print(f"❌ Initial data load failed: {str(e)}")
+    
     print("\n🔄 Starting automatic data update scheduler (every 24 hours)...")
     update_thread = threading.Thread(target=auto_update_data, daemon=True)
     update_thread.start()
     print("✅ Scheduler started")
-    
-    print("\n📊 Initial data fetch will happen in background...")
-    print("💡 Use /data/populate endpoint to add sample data immediately")
     
     print("\n" + "=" * 60)
     print("✅ ML API READY")

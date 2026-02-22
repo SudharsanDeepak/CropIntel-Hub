@@ -184,7 +184,7 @@ def update_market_data():
             "message": str(e)
         }
 
-@app.post("/data/populate")
+@app.get("/data/populate")
 def populate_sample_data():
     """
     Populate database with sample data for testing/demo.

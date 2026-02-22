@@ -31,11 +31,21 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+const MongoStore = require('connect-mongo');
+
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'your-session-secret',
     resave: false,
     saveUninitialized: false,
+    store: MongoStore.create({
+      mongoUrl: process.env.MONGO_URI,
+      touchAfter: 24 * 3600
+    }),
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24 * 7
+    }
   })
 );
 app.use(passport.initialize());

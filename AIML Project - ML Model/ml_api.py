@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI, Query, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from pymongo import MongoClient
@@ -9,6 +9,8 @@ from forecasting.forecast_generator import generate_forecast
 from pricing.price_forecast_generator import generate_price_forecast
 from optimization.stock_optimizer import optimize_stock
 from pricing.elasticity import calculate_elasticity
+import threading
+import time
 load_dotenv()
 app = FastAPI(title="Market Intelligence ML API")
 app.add_middleware(
@@ -22,6 +24,49 @@ mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 mongo_client = MongoClient(mongo_uri)
 db = mongo_client["market_analyzer"]
 collection = db["sales"]
+
+def auto_update_data():
+    """Background task to automatically update market data every 24 hours"""
+    while True:
+        try:
+            print(f"\n⏰ Auto-update triggered at {datetime.now()}")
+            from data_sources.api_fetcher import MarketDataFetcher
+            fetcher = MarketDataFetcher()
+            records = fetcher.fetch_all_products()
+            saved_count = fetcher.save_to_mongodb(records)
+            print(f"✅ Auto-updated {saved_count} records")
+        except Exception as e:
+            print(f"❌ Auto-update error: {str(e)}")
+        
+        time.sleep(24 * 60 * 60)
+
+@app.on_event("startup")
+async def startup_event():
+    """Run on application startup"""
+    print("\n" + "=" * 60)
+    print("🚀 ML API STARTING UP")
+    print("=" * 60)
+    
+    try:
+        print("\n📊 Fetching initial market data for 180 products...")
+        from data_sources.api_fetcher import MarketDataFetcher
+        fetcher = MarketDataFetcher()
+        records = fetcher.fetch_all_products()
+        saved_count = fetcher.save_to_mongodb(records)
+        print(f"✅ Loaded {saved_count} records from live sources")
+    except Exception as e:
+        print(f"⚠️  Initial data fetch failed: {str(e)}")
+        print("💡 Will retry in background...")
+    
+    print("\n🔄 Starting automatic data update scheduler (every 24 hours)...")
+    update_thread = threading.Thread(target=auto_update_data, daemon=True)
+    update_thread.start()
+    print("✅ Scheduler started")
+    
+    print("\n" + "=" * 60)
+    print("✅ ML API READY")
+    print("=" * 60 + "\n")
+
 @app.get("/")
 def health_check():
     return {"status": "ML Service Running", "data_source": "Real-time Market Data + MongoDB"}

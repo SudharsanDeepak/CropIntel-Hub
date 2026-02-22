@@ -193,7 +193,6 @@ def populate_sample_data(api_key: str = Header(None, alias="X-API-Key")):
     Requires API key in X-API-Key header.
     """
     verify_admin_key(api_key)
-    """
     try:
         import random
         from datetime import timedelta

@@ -36,9 +36,7 @@ coverage/
 *.h5
 *.model
 .kiro/
-180_PRODUCTS_COMPLETE.md
-ALL_ISSUES_FIXED.md
-COLOR_SCHEME_UPDATE.md
-EMAIL_OTP_READY.md
-EMAIL_OTP_SETUP.md
 Logo.png
+
+*.md
+!README.md

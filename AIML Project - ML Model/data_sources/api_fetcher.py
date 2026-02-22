@@ -25,19 +25,41 @@ class MarketDataFetcher:
         Note: Requires API key registration at https://agmarknet.gov.in/
         """
         try:
+            api_key = os.getenv("AGMARKNET_API_KEY", "")
+            if not api_key or api_key == "not_required":
+                print(f"⚠️  Agmarknet API key not configured")
+                return None
+            
             base_url = "https://api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070"
             params = {
-                "api-key": os.getenv("AGMARKNET_API_KEY", ""),
+                "api-key": api_key,
                 "format": "json",
                 "filters[commodity]": commodity,
                 "limit": 100
             }
-            response = requests.get(base_url, params=params, timeout=10)
+            
+            headers = {
+                "User-Agent": "CropIntelHub/1.0",
+                "Accept": "application/json"
+            }
+            
+            response = requests.get(base_url, params=params, headers=headers, timeout=15)
+            
             if response.status_code == 200:
                 data = response.json()
-                return self._parse_agmarknet_response(data)
+                if "records" in data and len(data["records"]) > 0:
+                    print(f"✅ Agmarknet: Fetched {len(data['records'])} records for {commodity}")
+                    return self._parse_agmarknet_response(data)
+                else:
+                    print(f"⚠️  Agmarknet: No records found for {commodity}")
+                    return None
+            elif response.status_code == 403:
+                print(f"⚠️  Agmarknet API: Access forbidden (403) - Check API key validity")
+                print(f"   API Key used: {api_key[:10]}...")
+                return None
             else:
                 print(f"⚠️  Agmarknet API returned status {response.status_code}")
+                print(f"   Response: {response.text[:200]}")
                 return None
         except Exception as e:
             print(f"❌ Agmarknet fetch failed: {str(e)}")
@@ -53,12 +75,28 @@ class MarketDataFetcher:
                 "q": commodity,
                 "limit": 50
             }
-            response = requests.get(base_url, params=params, timeout=10)
+            
+            headers = {
+                "User-Agent": "CropIntelHub/1.0",
+                "Accept": "application/json"
+            }
+            
+            response = requests.get(base_url, params=params, headers=headers, timeout=15)
+            
             if response.status_code == 200:
                 data = response.json()
-                return self._parse_usda_response(data, commodity)
+                if "results" in data and len(data["results"]) > 0:
+                    print(f"✅ USDA: Fetched {len(data['results'])} reports for {commodity}")
+                    return self._parse_usda_response(data, commodity)
+                else:
+                    print(f"⚠️  USDA: No reports found for {commodity}")
+                    return None
+            elif response.status_code == 403:
+                print(f"⚠️  USDA API: Access forbidden (403) - May need API key")
+                return None
             else:
                 print(f"⚠️  USDA API returned status {response.status_code}")
+                print(f"   Response: {response.text[:200]}")
                 return None
         except Exception as e:
             print(f"❌ USDA fetch failed: {str(e)}")

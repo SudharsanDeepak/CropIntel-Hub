@@ -35,22 +35,9 @@ def auto_update_data():
         try:
             print(f"\n⏰ Auto-update triggered at {datetime.now()}")
             
-            from data_sources.free_api_fetcher import FreeAPIFetcher
-            free_fetcher = FreeAPIFetcher()
-            saved_count = free_fetcher.update_market_data()
-            
-            if saved_count == 0:
-                print("⚠️  Free APIs returned no data, trying government APIs...")
-                from data_sources.api_fetcher import MarketDataFetcher
-                fetcher = MarketDataFetcher()
-                records = fetcher.fetch_all_products()
-                saved_count = fetcher.save_to_mongodb(records)
-            
-            if saved_count == 0:
-                print("⚠️  All external APIs failed, using alternative data source...")
-                from data_sources.alternative_fetcher import AlternativeMarketDataFetcher
-                alt_fetcher = AlternativeMarketDataFetcher()
-                saved_count = alt_fetcher.update_market_data(days=7)
+            from data_sources.comprehensive_market_fetcher import ComprehensiveMarketFetcher
+            fetcher = ComprehensiveMarketFetcher()
+            saved_count = fetcher.update_all_products(days=7)
             
             print(f"✅ Auto-updated {saved_count} records")
         except Exception as e:
@@ -332,23 +319,25 @@ def update_market_data(api_key: str = Header(None, alias="X-API-Key")):
 def populate_sample_data(api_key: str = Header(None, alias="X-API-Key")):
     """
     Populate database with realistic market data for all 180 products.
+    Uses comprehensive fetcher with API fallback strategy.
     Requires API key in X-API-Key header.
     """
     verify_admin_key(api_key)
     try:
-        from data_sources.alternative_fetcher import AlternativeMarketDataFetcher
+        from data_sources.comprehensive_market_fetcher import ComprehensiveMarketFetcher
         
-        fetcher = AlternativeMarketDataFetcher()
-        saved_count = fetcher.update_market_data(days=30)
+        fetcher = ComprehensiveMarketFetcher()
+        saved_count = fetcher.update_all_products(days=30)
         
-        product_count = len(fetcher.product_data)
+        product_count = len(fetcher.products_180)
         
         return {
             "status": "success",
             "message": f"Populated database with {saved_count} records for {product_count} products",
             "records_inserted": saved_count,
             "products": product_count,
-            "days": 30
+            "days": 30,
+            "data_sources": "Agmarknet API → USDA API → Realistic Simulation"
         }
     except Exception as e:
         return {

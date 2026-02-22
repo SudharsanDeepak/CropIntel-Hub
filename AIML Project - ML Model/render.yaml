@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: cropintel-hub-ml
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn ml_api:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: MONGO_URI
+        value: mongodb+srv://SudharsanDeepak:sudharsan@cluster0.g6tkwcc.mongodb.net/market_analyzer
+      - key: ADMIN_API_KEY
+        value: cropintelhub_admin
+      - key: DATA_UPDATE_INTERVAL
+        value: 0.0833
+      - key: AGMARKNET_API_KEY
+        value: your_api_key_here
+      - key: USDA_API_KEY
+        value: not_required

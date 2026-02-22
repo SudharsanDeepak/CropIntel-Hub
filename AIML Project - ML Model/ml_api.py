@@ -34,15 +34,21 @@ def auto_update_data():
     while True:
         try:
             print(f"\n⏰ Auto-update triggered at {datetime.now()}")
-            from data_sources.api_fetcher import MarketDataFetcher
-            from data_sources.alternative_fetcher import AlternativeMarketDataFetcher
             
-            fetcher = MarketDataFetcher()
-            records = fetcher.fetch_all_products()
-            saved_count = fetcher.save_to_mongodb(records)
+            from data_sources.free_api_fetcher import FreeAPIFetcher
+            free_fetcher = FreeAPIFetcher()
+            saved_count = free_fetcher.update_market_data()
             
             if saved_count == 0:
-                print("⚠️  External APIs failed, using alternative data source...")
+                print("⚠️  Free APIs returned no data, trying government APIs...")
+                from data_sources.api_fetcher import MarketDataFetcher
+                fetcher = MarketDataFetcher()
+                records = fetcher.fetch_all_products()
+                saved_count = fetcher.save_to_mongodb(records)
+            
+            if saved_count == 0:
+                print("⚠️  All external APIs failed, using alternative data source...")
+                from data_sources.alternative_fetcher import AlternativeMarketDataFetcher
                 alt_fetcher = AlternativeMarketDataFetcher()
                 saved_count = alt_fetcher.update_market_data(days=7)
             

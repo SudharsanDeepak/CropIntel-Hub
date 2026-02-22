@@ -138,6 +138,60 @@ def update_market_data():
             "status": "error",
             "message": str(e)
         }
+
+@app.post("/data/populate")
+def populate_sample_data():
+    """
+    Populate database with sample data for testing/demo.
+    """
+    try:
+        import random
+        from datetime import timedelta
+        
+        products = [
+            {"name": "Tomato", "category": "vegetable"},
+            {"name": "Potato", "category": "vegetable"},
+            {"name": "Onion", "category": "vegetable"},
+            {"name": "Apple", "category": "fruit"},
+            {"name": "Banana", "category": "fruit"},
+            {"name": "Carrot", "category": "vegetable"},
+            {"name": "Orange", "category": "fruit"},
+            {"name": "Mango", "category": "fruit"}
+        ]
+        
+        records = []
+        start_date = datetime.now() - timedelta(days=30)
+        
+        for day in range(30):
+            current_date = start_date + timedelta(days=day)
+            for product in products:
+                records.append({
+                    "date": current_date,
+                    "product": product["name"],
+                    "category": product["category"],
+                    "quantity": random.uniform(80, 200),
+                    "price": random.uniform(15, 50),
+                    "stock": random.uniform(100, 300),
+                    "temperature": random.uniform(20, 35),
+                    "rainfall": random.uniform(0, 15),
+                    "source": "sample_data"
+                })
+        
+        collection.delete_many({"source": "sample_data"})
+        result = collection.insert_many(records)
+        
+        return {
+            "status": "success",
+            "message": f"Populated database with {len(result.inserted_ids)} sample records",
+            "records_inserted": len(result.inserted_ids),
+            "products": len(products),
+            "days": 30
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": str(e)
+        }
 @app.get("/data/sources")
 def get_data_sources():
     """

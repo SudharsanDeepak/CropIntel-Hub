@@ -67,9 +67,11 @@ class MarketDataFetcher:
     def fetch_usda_data(self, commodity):
         """
         Fetch data from USDA Market News API (for international prices).
-        Free API, no key required for basic access.
+        Uses API key for authentication.
         """
         try:
+            api_key = os.getenv("USDA_API_KEY", "")
+            
             base_url = "https://marsapi.ams.usda.gov/services/v1.2/reports"
             params = {
                 "q": commodity,
@@ -81,7 +83,11 @@ class MarketDataFetcher:
                 "Accept": "application/json"
             }
             
-            response = requests.get(base_url, params=params, headers=headers, timeout=15)
+            if api_key and api_key != "not_required":
+                response = requests.get(base_url, params=params, headers=headers, 
+                                      auth=(api_key, ''), timeout=15)
+            else:
+                response = requests.get(base_url, params=params, headers=headers, timeout=15)
             
             if response.status_code == 200:
                 data = response.json()
@@ -92,7 +98,10 @@ class MarketDataFetcher:
                     print(f"⚠️  USDA: No reports found for {commodity}")
                     return None
             elif response.status_code == 403:
-                print(f"⚠️  USDA API: Access forbidden (403) - May need API key")
+                print(f"⚠️  USDA API: Access forbidden (403) - Check API key")
+                return None
+            elif response.status_code == 401:
+                print(f"⚠️  USDA API: Unauthorized (401) - Invalid API key")
                 return None
             else:
                 print(f"⚠️  USDA API returned status {response.status_code}")

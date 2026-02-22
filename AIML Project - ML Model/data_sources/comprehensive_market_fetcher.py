@@ -29,6 +29,10 @@ class ComprehensiveMarketFetcher:
         self.agmarknet_key = os.getenv("AGMARKNET_API_KEY", "")
         self.usda_key = os.getenv("USDA_API_KEY", "")
         
+        from data_sources.weather_fetcher import WeatherFetcher
+        self.weather_fetcher = WeatherFetcher()
+        self.current_weather = None
+        
         self.products_180 = [
             "Apple", "Banana", "Orange", "Mango", "Grape", "Strawberry", "Watermelon", 
             "Pineapple", "Papaya", "Guava", "Pomegranate", "Kiwi", "Lemon", "Lime", 
@@ -114,8 +118,10 @@ class ComprehensiveMarketFetcher:
             return None
     
     def fetch_usda_data(self, commodity):
-        """Fetch from USDA API"""
+        """Fetch from USDA API with authentication"""
         try:
+            api_key = os.getenv("USDA_API_KEY", "")
+            
             url = "https://marsapi.ams.usda.gov/services/v1.2/reports"
             params = {"q": commodity, "limit": 10}
             headers = {
@@ -123,7 +129,11 @@ class ComprehensiveMarketFetcher:
                 "Accept": "application/json"
             }
             
-            response = requests.get(url, params=params, headers=headers, timeout=10)
+            if api_key and api_key != "not_required":
+                response = requests.get(url, params=params, headers=headers, 
+                                      auth=(api_key, ''), timeout=10)
+            else:
+                response = requests.get(url, params=params, headers=headers, timeout=10)
             
             if response.status_code == 200:
                 data = response.json()
@@ -137,6 +147,9 @@ class ComprehensiveMarketFetcher:
     def generate_realistic_data(self, commodity, days=7):
         """Generate realistic market data based on commodity type"""
         records = []
+        
+        if self.current_weather is None:
+            self.current_weather = self.weather_fetcher.fetch_average_weather()
         
         category = "fruit" if commodity in ["Apple", "Banana", "Orange", "Mango", "Grape", 
                                             "Strawberry", "Watermelon", "Pineapple", "Papaya", 
@@ -163,8 +176,8 @@ class ComprehensiveMarketFetcher:
                 "price": round(base_price * price_variation, 2),
                 "unit": "kg",
                 "stock": round(base_quantity * quantity_variation * 1.5, 2),
-                "temperature": random.uniform(15, 35),
-                "rainfall": random.uniform(0, 50),
+                "temperature": self.current_weather["temperature"],
+                "rainfall": self.current_weather["rainfall"],
                 "source": "realistic_simulation",
                 "confidence": "high",
                 "seasonal": False
@@ -245,6 +258,13 @@ class ComprehensiveMarketFetcher:
         print("=" * 70)
         print(f"📊 Fetching data for {len(self.products_180)} products...")
         print(f"📅 Historical days: {days}")
+        
+        print("\n🌤️  Fetching real-time weather data...")
+        self.current_weather = self.weather_fetcher.fetch_average_weather()
+        print(f"   Temperature: {self.current_weather['temperature']}°C")
+        print(f"   Rainfall: {self.current_weather['rainfall']} mm")
+        print(f"   Humidity: {self.current_weather.get('humidity', 'N/A')}%")
+        
         print("=" * 70 + "\n")
         
         all_records = []
@@ -272,6 +292,7 @@ class ComprehensiveMarketFetcher:
                 print(f"📦 Products processed: {success_count}/{len(self.products_180)}")
                 print(f"💾 Records saved: {saved_count}")
                 print(f"📊 Average records per product: {saved_count // success_count if success_count > 0 else 0}")
+                print(f"🌤️  Weather: {self.current_weather['temperature']}°C, {self.current_weather['rainfall']}mm rain")
                 print("=" * 70 + "\n")
                 
                 return saved_count

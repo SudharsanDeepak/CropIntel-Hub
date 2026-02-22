@@ -209,7 +209,7 @@ const Analytics = () => {
     }
     try {
       const response = await axios.get(
-        `https://api.openweathermap.org/geo/1.0/direct?q=${searchQuery}&limit=5&appid=${WEATHER_API_KEY}`
+        `https://api.openweathermap.org/geo/1.0/direct?q=${value},IN&limit=10&appid=${WEATHER_API_KEY}`
       )
       
       if (response.data && response.data.length > 0) {
@@ -221,9 +221,24 @@ const Analytics = () => {
           lon: item.lon,
           display: `${item.name}${item.state ? ', ' + item.state : ''}, ${item.country}`
         }))
-        setLocationSuggestions(suggestions)
+        
+        const exactMatch = suggestions.find(s => 
+          s.name.toLowerCase() === value.toLowerCase()
+        )
+        
+        if (exactMatch) {
+          setLocationSuggestions([exactMatch, ...suggestions.filter(s => s !== exactMatch)])
+        } else {
+          setLocationSuggestions(suggestions)
+        }
       } else {
-        setLocationSuggestions([])
+        setLocationSuggestions([{
+          name: value,
+          country: 'IN',
+          state: 'Location not found',
+          display: `${value} (Not found - showing nearest match)`,
+          notFound: true
+        }])
       }
     } catch (error) {
       console.error('Error fetching location suggestions:', error)
@@ -464,11 +479,32 @@ const Analytics = () => {
                               <button
                                 key={index}
                                 onClick={() => selectLocation(suggestion)}
-                                className="w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-0"
+                                className={`w-full px-4 py-3 text-left hover:bg-blue-50 transition-colors border-b border-gray-100 last:border-0 ${
+                                  suggestion.notFound ? 'bg-yellow-50' : ''
+                                }`}
+                                disabled={suggestion.notFound}
                               >
-                                <div className="font-semibold text-gray-900">{suggestion.name}</div>
+                                <div className="font-semibold text-gray-900 flex items-center gap-2">
+                                  {suggestion.name}
+                                  {index === 0 && !suggestion.notFound && (
+                                    <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">
+                                      Best Match
+                                    </span>
+                                  )}
+                                  {suggestion.notFound && (
+                                    <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">
+                                      Not Found
+                                    </span>
+                                  )}
+                                </div>
                                 <div className="text-sm text-gray-500">
-                                  {suggestion.state && `${suggestion.state}, `}{suggestion.country}
+                                  {suggestion.notFound ? (
+                                    'Try searching for a nearby city or district'
+                                  ) : (
+                                    <>
+                                      {suggestion.state && `${suggestion.state}, `}{suggestion.country}
+                                    </>
+                                  )}
                                 </div>
                               </button>
                             ))}

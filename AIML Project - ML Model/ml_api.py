@@ -210,51 +210,23 @@ def update_market_data(api_key: str = Header(None, alias="X-API-Key")):
 @app.get("/data/populate")
 def populate_sample_data(api_key: str = Header(None, alias="X-API-Key")):
     """
-    Populate database with sample data for testing/demo.
+    Populate database with realistic market data for all 180 products.
     Requires API key in X-API-Key header.
     """
     verify_admin_key(api_key)
     try:
-        import random
-        from datetime import timedelta
+        from data_sources.alternative_fetcher import AlternativeMarketDataFetcher
         
-        products = [
-            {"name": "Tomato", "category": "vegetable"},
-            {"name": "Potato", "category": "vegetable"},
-            {"name": "Onion", "category": "vegetable"},
-            {"name": "Apple", "category": "fruit"},
-            {"name": "Banana", "category": "fruit"},
-            {"name": "Carrot", "category": "vegetable"},
-            {"name": "Orange", "category": "fruit"},
-            {"name": "Mango", "category": "fruit"}
-        ]
+        fetcher = AlternativeMarketDataFetcher()
+        saved_count = fetcher.update_market_data(days=30)
         
-        records = []
-        start_date = datetime.now() - timedelta(days=30)
-        
-        for day in range(30):
-            current_date = start_date + timedelta(days=day)
-            for product in products:
-                records.append({
-                    "date": current_date,
-                    "product": product["name"],
-                    "category": product["category"],
-                    "quantity": random.uniform(80, 200),
-                    "price": random.uniform(15, 50),
-                    "stock": random.uniform(100, 300),
-                    "temperature": random.uniform(20, 35),
-                    "rainfall": random.uniform(0, 15),
-                    "source": "sample_data"
-                })
-        
-        collection.delete_many({"source": "sample_data"})
-        result = collection.insert_many(records)
+        product_count = len(fetcher.product_data)
         
         return {
             "status": "success",
-            "message": f"Populated database with {len(result.inserted_ids)} sample records",
-            "records_inserted": len(result.inserted_ids),
-            "products": len(products),
+            "message": f"Populated database with {saved_count} records for {product_count} products",
+            "records_inserted": saved_count,
+            "products": product_count,
             "days": 30
         }
     except Exception as e:

@@ -55,21 +55,13 @@ async def startup_event():
     print("🚀 ML API STARTING UP")
     print("=" * 60)
     
-    try:
-        print("\n📊 Fetching initial market data for 180 products...")
-        from data_sources.api_fetcher import MarketDataFetcher
-        fetcher = MarketDataFetcher()
-        records = fetcher.fetch_all_products()
-        saved_count = fetcher.save_to_mongodb(records)
-        print(f"✅ Loaded {saved_count} records from live sources")
-    except Exception as e:
-        print(f"⚠️  Initial data fetch failed: {str(e)}")
-        print("💡 Will retry in background...")
-    
     print("\n🔄 Starting automatic data update scheduler (every 24 hours)...")
     update_thread = threading.Thread(target=auto_update_data, daemon=True)
     update_thread.start()
     print("✅ Scheduler started")
+    
+    print("\n📊 Initial data fetch will happen in background...")
+    print("💡 Use /data/populate endpoint to add sample data immediately")
     
     print("\n" + "=" * 60)
     print("✅ ML API READY")

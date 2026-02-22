@@ -16,7 +16,6 @@ build/
 .env.*.local
 !.env.development
 !.env.production
-!.env.example
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -40,3 +39,7 @@ Logo.png
 
 *.md
 !README.md
+
+# Ignore config files with potential secrets
+.env.example
+vite.config.js

@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Query, BackgroundTasks
+from fastapi import FastAPI, Query, BackgroundTasks, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from pymongo import MongoClient
@@ -24,6 +24,14 @@ mongo_uri = os.getenv("MONGO_URI", "mongodb://localhost:27017/")
 mongo_client = MongoClient(mongo_uri)
 db = mongo_client["market_analyzer"]
 collection = db["sales"]
+
+ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "cropintelhub_admin")
+
+def verify_admin_key(api_key: str = Header(None, alias="X-API-Key")):
+    """Verify admin API key for protected endpoints"""
+    if api_key != ADMIN_API_KEY:
+        raise HTTPException(status_code=403, detail="Invalid or missing API key")
+    return api_key
 
 def auto_update_data():
     """Background task to automatically update market data every 24 hours"""
@@ -163,11 +171,12 @@ def elasticity():
     data = calculate_elasticity()
     return data.to_dict(orient="records")
 @app.get("/data/update")
-def update_market_data():
+def update_market_data(api_key: str = Header(None, alias="X-API-Key")):
     """
     Manually trigger market data update from external APIs.
-    Can be called from browser to fetch fresh data.
+    Requires API key in X-API-Key header.
     """
+    verify_admin_key(api_key)
     try:
         from data_sources.api_fetcher import MarketDataFetcher
         fetcher = MarketDataFetcher()
@@ -186,9 +195,12 @@ def update_market_data():
         }
 
 @app.get("/data/populate")
-def populate_sample_data():
+def populate_sample_data(api_key: str = Header(None, alias="X-API-Key")):
     """
     Populate database with sample data for testing/demo.
+    Requires API key in X-API-Key header.
+    """
+    verify_admin_key(api_key)
     """
     try:
         import random

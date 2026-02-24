@@ -1,6 +1,6 @@
 const axios = require("axios");
 
-const ML_BASE_URL = "https://cropintel-hub-ml.onrender.com"
+const ML_BASE_URL = process.env.ML_API_URL || "http://localhost:8000"
 
 const getStockOptimization = async (days) => {
   try {

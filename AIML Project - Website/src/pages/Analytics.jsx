@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { BarChart3, TrendingUp, Package, DollarSign, Cloud, CloudRain, Sun, Wind, Droplets, ThermometerSun, Newspaper, AlertTriangle, TrendingDown, Calendar, MapPin, Search, RefreshCw } from 'lucide-react'
+import { BarChart3, TrendingUp, Package, DollarSign, Cloud, CloudRain, Sun, Wind, Droplets, ThermometerSun, Newspaper, AlertTriangle, TrendingDown, Calendar, MapPin, Search, RefreshCw, Eye, Gauge, Sunrise, Sunset, CloudDrizzle, Navigation } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, ComposedChart } from 'recharts'
 
@@ -9,6 +10,7 @@ const WEATHER_API_KEY = '4d8fb5b93d4af21d66a2948710284366'
 const WEATHER_API_URL = 'https://api.openweathermap.org/data/2.5'
 
 const Analytics = () => {
+  const navigate = useNavigate()
   const [products, setProducts] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [weatherData, setWeatherData] = useState(null)
@@ -18,26 +20,43 @@ const Analytics = () => {
   const [showLocationSearch, setShowLocationSearch] = useState(false)
   const [weatherLoading, setWeatherLoading] = useState(false)
   const [locationSuggestions, setLocationSuggestions] = useState([])
-  const [activeTab, setActiveTab] = useState('bestDeals') 
+  const [activeTab, setActiveTab] = useState('bestDeals')
+  const [selectedWeatherProduct, setSelectedWeatherProduct] = useState(null)
+  const [hourlyForecast, setHourlyForecast] = useState([])
+  const [showHourlyForecast, setShowHourlyForecast] = useState(false)
+  
+  // Load saved location from localStorage on mount
+  useEffect(() => {
+    const savedLocation = localStorage.getItem('weatherLocation')
+    if (savedLocation) {
+      setLocation(savedLocation)
+    } else {
+      detectUserLocation()
+    }
+  }, [])
+  
   useEffect(() => {
     fetchProducts()
     fetchMarketNews()
   }, [])
+  
   useEffect(() => {
     if (location) {
       fetchWeatherData(location)
     }
   }, [location])
-  useEffect(() => {
-    detectUserLocation()
-  }, [])
   const fetchProducts = async () => {
     try {
       setIsLoading(true)
       const response = await axios.get(`${API_URL}/api/products/latest`, {
         timeout: 10000
       })
-      setProducts(response.data || [])
+      const data = response.data || []
+      setProducts(data)
+      // Set first product as default for weather impact
+      if (data.length > 0 && !selectedWeatherProduct) {
+        setSelectedWeatherProduct(data[0].product)
+      }
     } catch (error) {
       console.error('Error fetching products:', error)
       setProducts([])
@@ -74,18 +93,42 @@ const Analytics = () => {
         `https://api.openweathermap.org/geo/1.0/direct?q=${cityName}&limit=5&appid=${WEATHER_API_KEY}`
       )
       
-      let weatherUrl, forecastUrl
+      let weatherUrl, forecastUrl, airQualityUrl
       if (geoResponse.data && geoResponse.data.length > 0) {
         const { lat, lon, name, country } = geoResponse.data[0]
         weatherUrl = `${WEATHER_API_URL}/weather?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=metric`
         forecastUrl = `${WEATHER_API_URL}/forecast?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}&units=metric`
-        setLocation(`${name}, ${country}`)
+        airQualityUrl = `http://api.openweathermap.org/data/2.5/air_pollution?lat=${lat}&lon=${lon}&appid=${WEATHER_API_KEY}`
+        const locationName = `${name}, ${country}`
+        setLocation(locationName)
+        // Save to localStorage
+        localStorage.setItem('weatherLocation', locationName)
       } else {
         weatherUrl = `${WEATHER_API_URL}/weather?q=${encodeURIComponent(cityName)}&appid=${WEATHER_API_KEY}&units=metric`
         forecastUrl = `${WEATHER_API_URL}/forecast?q=${encodeURIComponent(cityName)}&appid=${WEATHER_API_KEY}&units=metric`
+        // Save to localStorage
+        localStorage.setItem('weatherLocation', cityName)
       }
-      const currentWeather = await axios.get(weatherUrl)
-      const forecast = await axios.get(forecastUrl)
+      
+      const [currentWeather, forecast, airQuality] = await Promise.all([
+        axios.get(weatherUrl),
+        axios.get(forecastUrl),
+        airQualityUrl ? axios.get(airQualityUrl).catch(() => null) : Promise.resolve(null)
+      ])
+      
+      // Process hourly forecast (next 24 hours)
+      const hourlyData = forecast.data.list.slice(0, 8).map(item => {
+        const date = new Date(item.dt * 1000)
+        return {
+          time: date.toLocaleTimeString('en-US', { hour: 'numeric', hour12: true }),
+          temp: Math.round(item.main.temp),
+          condition: item.weather[0].main,
+          icon: item.weather[0].icon,
+          rainfall: item.rain?.['3h'] || 0
+        }
+      })
+      setHourlyForecast(hourlyData)
+      
       const dailyForecast = []
       const forecastByDay = {}
       forecast.data.list.forEach(item => {
@@ -114,6 +157,7 @@ const Analytics = () => {
           condition: data.conditions[0]
         })
       })
+      
       const alerts = []
       const heavyRainDays = dailyForecast.filter(d => d.rainfall > 20)
       if (heavyRainDays.length > 0) {
@@ -145,15 +189,36 @@ const Analytics = () => {
           affectedProducts: ['Carrot', 'Radish', 'Turnip', 'Beetroot']
         })
       }
+      
+      // Air quality index interpretation
+      const getAQILevel = (aqi) => {
+        if (aqi === 1) return { level: 'Good', color: 'green' }
+        if (aqi === 2) return { level: 'Fair', color: 'yellow' }
+        if (aqi === 3) return { level: 'Moderate', color: 'orange' }
+        if (aqi === 4) return { level: 'Poor', color: 'red' }
+        return { level: 'Very Poor', color: 'purple' }
+      }
+      
+      const airQualityData = airQuality?.data?.list?.[0]
+      const aqiInfo = airQualityData ? getAQILevel(airQualityData.main.aqi) : null
+      
       setWeatherData({
         current: {
           temp: Math.round(currentWeather.data.main.temp),
+          feelsLike: Math.round(currentWeather.data.main.feels_like),
           humidity: currentWeather.data.main.humidity,
           condition: currentWeather.data.weather[0].main,
           description: currentWeather.data.weather[0].description,
           windSpeed: Math.round(currentWeather.data.wind.speed * 3.6), 
+          windDirection: currentWeather.data.wind.deg,
+          pressure: currentWeather.data.main.pressure,
+          visibility: Math.round(currentWeather.data.visibility / 1000), // km
+          cloudiness: currentWeather.data.clouds.all,
+          sunrise: new Date(currentWeather.data.sys.sunrise * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
+          sunset: new Date(currentWeather.data.sys.sunset * 1000).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true }),
           location: `${currentWeather.data.name}, ${currentWeather.data.sys.country}`,
-          icon: currentWeather.data.weather[0].icon
+          icon: currentWeather.data.weather[0].icon,
+          airQuality: aqiInfo
         },
         forecast: dailyForecast,
         alerts: alerts.length > 0 ? alerts : [{
@@ -305,20 +370,28 @@ const Analytics = () => {
     setMarketNews(news)
   }
   const weatherImpactData = useMemo(() => {
-    if (!weatherData || products.length === 0) return []
+    if (!weatherData || products.length === 0 || !selectedWeatherProduct) return []
+    
+    // Find the selected product's current price
+    const selectedProduct = products.find(p => p.product === selectedWeatherProduct)
+    const basePrice = selectedProduct ? selectedProduct.price : 50
+    
     return weatherData.forecast.map((day, index) => {
+      // Rainfall impact: Heavy rain increases prices (supply disruption)
       const rainfallImpact = day.rainfall > 20 ? 1.15 : day.rainfall > 10 ? 1.08 : 1.0
+      // Temperature impact: Extreme heat can reduce prices (faster spoilage)
       const tempImpact = day.temp > 30 ? 0.95 : 1.0
+      
       return {
         day: day.day,
-        basePrice: 50,
-        predictedPrice: (50 * rainfallImpact * tempImpact).toFixed(2),
+        basePrice: parseFloat(basePrice.toFixed(2)),
+        predictedPrice: parseFloat((basePrice * rainfallImpact * tempImpact).toFixed(2)),
         rainfall: day.rainfall,
         temp: day.temp,
         impact: rainfallImpact > 1.1 ? 'High' : rainfallImpact > 1.05 ? 'Medium' : 'Low'
       }
     })
-  }, [weatherData, products])
+  }, [weatherData, products, selectedWeatherProduct])
   const marketStats = useMemo(() => {
     if (products.length === 0) return null
     const totalVolume = products.reduce((sum, p) => sum + p.predicted_demand, 0)
@@ -357,6 +430,12 @@ const Analytics = () => {
       .slice(0, 6)
     return { bestDeals, priceDrops, highDemand, seasonal }
   }, [products])
+  
+  const handleViewDetails = (product) => {
+    // Navigate to Price Tracker with the selected product
+    navigate('/tracker', { state: { selectedProduct: product.product } })
+  }
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
@@ -553,6 +632,9 @@ const Analytics = () => {
                     <div className="text-lg sm:text-xl text-white/90 font-medium capitalize">
                       {weatherData?.current.description || weatherData?.current.condition}
                     </div>
+                    <div className="text-sm text-white/70 mt-1">
+                      Feels like {weatherData?.current.feelsLike}°C
+                    </div>
                   </div>
                 </div>
                 {}
@@ -578,6 +660,112 @@ const Analytics = () => {
                   </div>
                 </div>
               </div>
+              
+              {}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-6">
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 shadow-md">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Eye className="h-4 w-4 text-white/70" />
+                    <span className="text-xs text-white/60 font-medium">Visibility</span>
+                  </div>
+                  <div className="text-xl font-bold text-white">{weatherData?.current.visibility} km</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 shadow-md">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Gauge className="h-4 w-4 text-white/70" />
+                    <span className="text-xs text-white/60 font-medium">Pressure</span>
+                  </div>
+                  <div className="text-xl font-bold text-white">{weatherData?.current.pressure} hPa</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 shadow-md">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Sunrise className="h-4 w-4 text-white/70" />
+                    <span className="text-xs text-white/60 font-medium">Sunrise</span>
+                  </div>
+                  <div className="text-lg font-bold text-white">{weatherData?.current.sunrise}</div>
+                </div>
+                <div className="bg-white/10 backdrop-blur-md rounded-xl p-3 shadow-md">
+                  <div className="flex items-center gap-2 mb-1">
+                    <Sunset className="h-4 w-4 text-white/70" />
+                    <span className="text-xs text-white/60 font-medium">Sunset</span>
+                  </div>
+                  <div className="text-lg font-bold text-white">{weatherData?.current.sunset}</div>
+                </div>
+              </div>
+              
+              {}
+              {weatherData?.current.airQuality && (
+                <div className="mt-4 bg-white/10 backdrop-blur-md rounded-xl p-4 shadow-md">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Wind className="h-5 w-5 text-white/80" />
+                      <span className="text-sm text-white/70 font-medium">Air Quality</span>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                      weatherData.current.airQuality.color === 'green' ? 'bg-green-500 text-white' :
+                      weatherData.current.airQuality.color === 'yellow' ? 'bg-yellow-500 text-white' :
+                      weatherData.current.airQuality.color === 'orange' ? 'bg-orange-500 text-white' :
+                      weatherData.current.airQuality.color === 'red' ? 'bg-red-500 text-white' :
+                      'bg-purple-500 text-white'
+                    }`}>
+                      {weatherData.current.airQuality.level}
+                    </span>
+                  </div>
+                </div>
+              )}
+              
+              {}
+              {hourlyForecast.length > 0 && (
+                <div className="mt-6">
+                  <button
+                    onClick={() => setShowHourlyForecast(!showHourlyForecast)}
+                    className="w-full flex items-center justify-between bg-white/10 backdrop-blur-md rounded-xl p-4 shadow-md hover:bg-white/15 transition-all"
+                  >
+                    <span className="text-white font-semibold flex items-center gap-2">
+                      <Calendar className="h-5 w-5" />
+                      24-Hour Forecast
+                    </span>
+                    <motion.div
+                      animate={{ rotate: showHourlyForecast ? 180 : 0 }}
+                      transition={{ duration: 0.3 }}
+                    >
+                      <TrendingDown className="h-5 w-5 text-white" />
+                    </motion.div>
+                  </button>
+                  
+                  <AnimatePresence>
+                    {showHourlyForecast && (
+                      <motion.div
+                        initial={{ height: 0, opacity: 0 }}
+                        animate={{ height: 'auto', opacity: 1 }}
+                        exit={{ height: 0, opacity: 0 }}
+                        transition={{ duration: 0.3 }}
+                        className="overflow-hidden"
+                      >
+                        <div className="mt-3 grid grid-cols-4 md:grid-cols-8 gap-2">
+                          {hourlyForecast.map((hour, index) => (
+                            <div key={index} className="bg-white/10 backdrop-blur-md rounded-lg p-3 text-center">
+                              <div className="text-xs text-white/70 mb-1">{hour.time}</div>
+                              <div className="text-2xl mb-1">
+                                {hour.condition === 'Clear' ? '☀️' :
+                                 hour.condition === 'Clouds' ? '☁️' :
+                                 hour.condition === 'Rain' ? '🌧️' :
+                                 hour.condition === 'Snow' ? '❄️' : '🌤️'}
+                              </div>
+                              <div className="text-lg font-bold text-white">{hour.temp}°</div>
+                              {hour.rainfall > 0 && (
+                                <div className="text-xs text-blue-200 mt-1">
+                                  {hour.rainfall}mm
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
+              )}
             </div>
           </motion.div>
           {}
@@ -655,8 +843,30 @@ const Analytics = () => {
             className="card"
           >
             <div className="mb-6">
-              <h2 className="text-xl font-bold text-gray-900">Weather Impact on Prices</h2>
-              <p className="text-sm text-gray-600 mt-1">7-day price predictions based on weather forecast</p>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900">Weather Impact on Prices</h2>
+                  <p className="text-sm text-gray-600 mt-1">7-day price predictions based on weather forecast</p>
+                </div>
+                {/* Product Selector */}
+                <div className="min-w-[250px]">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">
+                    Select Product
+                  </label>
+                  <select
+                    value={selectedWeatherProduct || ''}
+                    onChange={(e) => setSelectedWeatherProduct(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-primary-500 text-sm"
+                    disabled={isLoading || products.length === 0}
+                  >
+                    {products.map((product) => (
+                      <option key={product.product} value={product.product}>
+                        {product.product} - ₹{product.price.toFixed(2)}/kg
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
             </div>
             {}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -767,7 +977,14 @@ const Analytics = () => {
             </div>
             {}
             <div className="mt-6 p-4 bg-gray-50 rounded-xl">
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Weather Impact Summary</h3>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-gray-700">Weather Impact Summary</h3>
+                {selectedWeatherProduct && (
+                  <span className="text-xs font-medium text-primary-600 bg-primary-50 px-3 py-1 rounded-full">
+                    {selectedWeatherProduct}
+                  </span>
+                )}
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {weatherImpactData.slice(0, 3).map((day, index) => (
                   <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg">
@@ -786,6 +1003,20 @@ const Analytics = () => {
                     </span>
                   </div>
                 ))}
+              </div>
+              {/* Info Box */}
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-2">
+                  <Cloud className="h-4 w-4 text-blue-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-xs text-blue-900">
+                    <p className="font-semibold mb-1">How it works:</p>
+                    <ul className="space-y-0.5 text-blue-800">
+                      <li>• Heavy rainfall (&gt;20mm): +15% price increase (supply disruption)</li>
+                      <li>• Moderate rainfall (&gt;10mm): +8% price increase</li>
+                      <li>• High temperature (&gt;30°C): -5% price decrease (faster spoilage)</li>
+                    </ul>
+                  </div>
+                </div>
               </div>
             </div>
           </motion.div>
@@ -896,7 +1127,10 @@ const Analytics = () => {
                   </span>
                 </div>
               </div>
-              <button className="mt-4 w-full btn-primary text-sm">
+              <button 
+                onClick={() => handleViewDetails(product)}
+                className="mt-4 w-full btn-primary text-sm"
+              >
                 View Details
               </button>
             </motion.div>

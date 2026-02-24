@@ -1,11 +1,13 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { Search, TrendingUp, TrendingDown, X, Calendar, Package, DollarSign, BarChart3 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import axios from 'axios'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 const PriceTracker = () => {
+  const location = useLocation()
   const [products, setProducts] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
@@ -13,9 +15,22 @@ const PriceTracker = () => {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [productForecast, setProductForecast] = useState(null)
   const [forecastLoading, setForecastLoading] = useState(false)
+  
   useEffect(() => {
     fetchProducts()
   }, [])
+  
+  // Handle product selection from navigation state
+  useEffect(() => {
+    if (location.state?.selectedProduct && products.length > 0) {
+      const product = products.find(p => p.product === location.state.selectedProduct)
+      if (product) {
+        handleProductClick(product)
+        // Clear the navigation state
+        window.history.replaceState({}, document.title)
+      }
+    }
+  }, [location.state, products])
   const fetchProducts = async () => {
     try {
       setIsLoading(true)

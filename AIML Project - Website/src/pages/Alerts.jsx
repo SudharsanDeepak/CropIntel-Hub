@@ -6,10 +6,13 @@ import { ToastContainer } from '../components/Toast'
 import { useToast } from '../hooks/useToast'
 import ConfirmModal from '../components/ConfirmModal'
 import { useConfirm } from '../hooks/useConfirm'
+import { useAuth } from '../context/AuthContext'
+import { withAuth } from '../utils/authHeaders'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 const Alerts = () => {
+  const { user } = useAuth()
   const [alerts, setAlerts] = useState([])
   const [products, setProducts] = useState([])
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -22,15 +25,16 @@ const Alerts = () => {
     product: '',
     targetPrice: '',
     condition: 'below', 
-    email: '',
     notifyOnce: false
   })
   const [formErrors, setFormErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  
   useEffect(() => {
     fetchProducts()
     fetchAlerts()
   }, [])
+  
   const fetchProducts = async () => {
     try {
       setIsLoading(true)
@@ -46,12 +50,13 @@ const Alerts = () => {
       setIsLoading(false)
     }
   }
+  
   const fetchAlerts = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/alerts`, {
-        params: { email: formData.email || undefined },
+      // Use authenticated request - no need to pass email
+      const response = await axios.get(`${API_URL}/api/alerts`, withAuth({
         timeout: 10000
-      });
+      }));
       setAlerts(response.data || []);
     } catch (err) {
       console.error('Error fetching alerts:', err);
@@ -70,9 +75,6 @@ const Alerts = () => {
     if (!formData.targetPrice || parseFloat(formData.targetPrice) <= 0) {
       errors.targetPrice = 'Please enter a valid price'
     }
-    if (!formData.email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-      errors.email = 'Please enter a valid email address'
-    }
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -86,18 +88,16 @@ const Alerts = () => {
           product: formData.product,
           targetPrice: parseFloat(formData.targetPrice),
           condition: formData.condition,
-          email: formData.email,
           notifyOnce: formData.notifyOnce,
-        });
+        }, withAuth());
         success('Price alert updated successfully!')
       } else {
         await axios.post(`${API_URL}/api/alerts`, {
           product: formData.product,
           targetPrice: parseFloat(formData.targetPrice),
           condition: formData.condition,
-          email: formData.email,
           notifyOnce: formData.notifyOnce,
-        });
+        }, withAuth());
         success('Price alert created! You will receive an email when the price condition is met.')
       }
       await fetchAlerts()
@@ -105,14 +105,17 @@ const Alerts = () => {
         product: '',
         targetPrice: '',
         condition: 'below',
-        email: '',
         notifyOnce: false
       })
       setEditingAlert(null)
       setShowCreateModal(false)
     } catch (err) {
       console.error('Error saving alert:', err)
-      error('Failed to save alert. Please try again.')
+      if (err.response?.status === 401) {
+        error('Please log in to create alerts.')
+      } else {
+        error('Failed to save alert. Please try again.')
+      }
     } finally {
       setIsSubmitting(false)
     }
@@ -138,7 +141,7 @@ const Alerts = () => {
     })
     if (confirmed) {
       try {
-        await axios.delete(`${API_URL}/api/alerts/${alertId}`);
+        await axios.delete(`${API_URL}/api/alerts/${alertId}`, withAuth());
         await fetchAlerts();
         success('Alert deleted successfully!')
       } catch (err) {
@@ -149,7 +152,7 @@ const Alerts = () => {
   }
   const handleToggleAlert = async (alertId) => {
     try {
-      await axios.patch(`${API_URL}/api/alerts/${alertId}/toggle`);
+      await axios.patch(`${API_URL}/api/alerts/${alertId}/toggle`, {}, withAuth());
       await fetchAlerts();
       success('Alert status updated!')
     } catch (err) {
@@ -159,7 +162,7 @@ const Alerts = () => {
   }
   const handleResetAlert = async (alertId) => {
     try {
-      await axios.patch(`${API_URL}/api/alerts/${alertId}/reset`);
+      await axios.patch(`${API_URL}/api/alerts/${alertId}/reset`, {}, withAuth());
       await fetchAlerts();
       success('Alert reactivated successfully!')
     } catch (err) {
@@ -225,7 +228,7 @@ const Alerts = () => {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {alerts.map((alert, index) => (
             <motion.div
-              key={alert.id}
+              key={alert._id || alert.id || index}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}

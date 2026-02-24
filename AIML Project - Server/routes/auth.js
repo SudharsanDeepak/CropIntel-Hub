@@ -12,12 +12,17 @@ const generateOTP = () => {
 router.post('/send-otp-signup', async (req, res) => {
   try {
     const { email } = req.body;
+    
+    console.log('📧 Send OTP Signup request for:', email);
+    
     if (!email) {
       return res.status(400).json({ 
         success: false, 
         message: 'Email is required' 
       });
     }
+    
+    // Check if user already exists
     const existingUser = await User.findOne({ email });
     if (existingUser) {
       return res.status(400).json({ 
@@ -25,37 +30,57 @@ router.post('/send-otp-signup', async (req, res) => {
         message: 'User already exists with this email' 
       });
     }
+    
+    // Generate OTP
     const otp = generateOTP();
+    console.log('🔢 Generated OTP:', otp);
+    
+    // Delete any existing OTPs for this email
     await OTP.deleteMany({ email, purpose: 'signup' });
+    
+    // Save new OTP
     const otpDoc = new OTP({
       email,
       otp,
       purpose: 'signup',
     });
     await otpDoc.save();
+    console.log('💾 OTP saved to database');
+    
+    // Send email
     const emailResult = await sendOTPEmail(email, otp, 'signup');
-    if (!emailResult.success) {
+    console.log('📨 Email result:', emailResult);
+    
+    if (!emailResult.success && !emailResult.devMode) {
+      console.error('❌ Email sending failed:', emailResult.error);
       return res.status(500).json({ 
         success: false, 
         message: 'Failed to send OTP email. Please try again.' 
       });
     }
+    
+    // Success response
     const response = {
       success: true,
       message: emailResult.devMode 
         ? `OTP: ${otp} (Email not configured - showing OTP for testing)`
         : 'OTP sent to your email. Please check your inbox.',
     };
+    
     if (emailResult.devMode) {
       response.devMode = true;
       response.otp = otp; 
     }
+    
+    console.log('✅ OTP sent successfully');
     res.json(response);
   } catch (error) {
-    console.error('Send OTP Error:', error);
+    console.error('❌ Send OTP Error:', error);
+    console.error('Error stack:', error.stack);
     res.status(500).json({ 
       success: false, 
-      message: 'Server error while sending OTP' 
+      message: 'Server error while sending OTP',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
 });

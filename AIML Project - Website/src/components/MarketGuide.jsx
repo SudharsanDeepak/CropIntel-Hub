@@ -43,82 +43,85 @@ const MarketGuide = () => {
       conversationManager.clear()
     }
   }, [isOpen, conversationManager])
-  const fetchProducts = async () => {
+  const fetchProducts = async (retryCount = 0) => {
     try {
       const response = await axios.get(`${API_URL}/api/products/latest`, {
-        timeout: 10000
+        timeout: 30000 // Increased to 30 seconds
       })
       setProducts(response.data || [])
     } catch (error) {
       console.error('Error fetching products:', error)
+      
+      // Retry logic: retry up to 2 times with exponential backoff
+      if (retryCount < 2) {
+        const delay = Math.pow(2, retryCount) * 1000 // 1s, 2s
+        console.log(`Retrying in ${delay}ms... (attempt ${retryCount + 1}/2)`)
+        setTimeout(() => fetchProducts(retryCount + 1), delay)
+      } else {
+        // Keep existing products if fetch fails after retries
+        console.warn('Failed to fetch products after retries, using cached data')
+      }
     }
   }
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }
-  const callGemini = async (userMessage, conversationManager, apiKey) => {
+  const callGroq = async (userMessage, conversationManager, apiKey) => {
     try {
-      const productList = products.map(p => 
-        `${p.product}: ₹${p.price.toFixed(2)}/kg (${p.category}, Demand: ${p.predicted_demand.toFixed(0)} units, Stock: ${p.stock})`
-      ).join('\n')
-      const conversationHistory = conversationManager.getHistory(5)
-      const historyText = conversationHistory.map(msg => 
-        `${msg.role === 'user' ? 'User' : 'Assistant'}: ${msg.content}`
-      ).join('\n')
-      const prompt = `You are Market Guide, an intelligent AI assistant for a fruit and vegetable market intelligence platform.
-CURRENT PRODUCT DATABASE (${products.length} products):
-${productList}
-CONVERSATION HISTORY:
-${historyText}
-YOUR ROLE:
-- Help users find product prices and information
-- Recommend best deals and seasonal products
-- Explain market trends and weather impacts
-- Guide users to platform features (Alerts, Compare, Forecast, Analytics)
-- Provide accurate, helpful, and friendly responses
-RESPONSE GUIDELINES:
-- Always use EXACT product names and prices from the database above
-- When asked about multiple products, provide info for ALL of them
-- Format prices as ₹XX.XX/kg
-- Be conversational, helpful, and concise (max 500 tokens)
-- If a product isn't in the database, suggest similar alternatives
-- Use emojis sparingly (max 3 per response)
-
-USER QUESTION: ${userMessage}
-
-Please provide a helpful response:`
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${import.meta.env.VITE_GEMINI_API_KEY}`,
+      const productList = products.slice(0, 50).map(p => 
+        `${p.product}: ₹${p.price.toFixed(2)}/kg`
+      ).join(', ')
+      
+      const conversationHistory = conversationManager.getHistory(3)
+      const messages = [
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            contents: [{
-              parts: [{
-                text: prompt
-              }]
-            }],
-            generationConfig: {
-              temperature: 0.7,
-              maxOutputTokens: 500,
-            }
-          })
+          role: 'system',
+          content: `You are Market Guide for a fruit & vegetable market platform. Current products: ${productList}. Help users find prices, recommend deals, and provide market insights. Be concise and helpful.`
+        },
+        ...conversationHistory.map(msg => ({
+          role: msg.role === 'user' ? 'user' : 'assistant',
+          content: msg.content
+        })),
+        {
+          role: 'user',
+          content: userMessage
         }
-      )
+      ]
+
+      console.log('📤 Sending request to Groq API...')
+      
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: 'llama-3.3-70b-versatile',
+          messages: messages,
+          temperature: 0.7,
+          max_tokens: 500,
+        })
+      })
+      
       if (!response.ok) {
-        throw new Error(`Gemini API error: ${response.status}`)
+        const errorData = await response.json().catch(() => ({}))
+        console.error('Groq API error details:', errorData)
+        throw new Error(`Groq API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`)
       }
+      
       const data = await response.json()
-      const aiResponse = data.candidates?.[0]?.content?.parts?.[0]?.text
+      const aiResponse = data.choices?.[0]?.message?.content
+      
       if (!aiResponse || aiResponse.length < 10) {
-        throw new Error('Invalid response from Gemini')
+        throw new Error('Invalid response from Groq')
       }
+      
+      console.log('✅ Groq API response received')
       return aiResponse
+      
     } catch (error) {
-      console.error('Gemini API error:', error)
+      console.error('Groq API error:', error)
       throw error
     }
   }
@@ -148,31 +151,26 @@ Please provide a helpful response:`
         products: matchedProducts.map(m => m.product.product),
         intent: parsedQuery.intent
       })
-      const apiKey = import.meta.env.VITE_OPENAI_API_KEY
+      const apiKey = import.meta.env.VITE_GROQ_API_KEY
       console.log('🔑 API Key check:', {
         exists: !!apiKey,
-        startsWithSk: apiKey?.startsWith('sk-'),
-        startsWithAIza: apiKey?.startsWith('AIza'),
+        startsWithGsk: apiKey?.startsWith('gsk_'),
         length: apiKey?.length,
         first10: apiKey?.substring(0, 10)
       })
-      const isValidKey = apiKey && (
-        apiKey.startsWith('sk-') ||  
-        apiKey.startsWith('AIza')     
-      )
+      
+      const isValidKey = apiKey && apiKey.startsWith('gsk_')
+      
       if (isValidKey) {
-        const apiType = apiKey.startsWith('AIza') ? 'Google Gemini' : 'OpenAI'
-        console.log(`✅ Using ${apiType} API`)
+        console.log('✅ Using Groq API')
         try {
-          const aiResponse = apiKey.startsWith('AIza') 
-            ? await callGemini(resolvedMessage, conversationManager, apiKey)
-            : await callOpenAI(resolvedMessage, conversationManager, apiKey)
+          const aiResponse = await callGroq(resolvedMessage, conversationManager, apiKey)
           conversationManager.addMessage('assistant', aiResponse, {
             products: matchedProducts.map(m => m.product.product)
           })
           return aiResponse
         } catch (error) {
-          console.error(`❌ ${apiType} API failed:`, error.message)
+          console.error('❌ Groq API failed:', error.message)
         }
       } else {
         console.log('⚠️ Using fallback system (no valid API key)')

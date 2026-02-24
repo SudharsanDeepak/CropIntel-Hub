@@ -1,18 +1,40 @@
 const passport = require('passport');
 const GoogleStrategy = require('passport-google-oauth20').Strategy;
 const User = require('../models/User');
+
+// Determine the correct callback URL based on environment
+const getCallbackURL = () => {
+  // Check if we're in production
+  const isProduction = process.env.NODE_ENV === 'production';
+  
+  // Use environment-specific URL
+  if (isProduction) {
+    // Production: Use deployed backend URL
+    return `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google/callback`;
+  } else {
+    // Development: Use localhost
+    return `http://localhost:${process.env.PORT || 5000}/api/auth/google/callback`;
+  }
+};
+
 if (
   process.env.GOOGLE_CLIENT_ID &&
   process.env.GOOGLE_CLIENT_ID !== 'your-google-client-id-here' &&
   process.env.GOOGLE_CLIENT_SECRET &&
   process.env.GOOGLE_CLIENT_SECRET !== 'your-google-client-secret-here'
 ) {
+  const callbackURL = getCallbackURL();
+  
+  console.log(`🔐 Google OAuth Configuration:`);
+  console.log(`   Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`   Callback URL: ${callbackURL}`);
+  
   passport.use(
     new GoogleStrategy(
       {
         clientID: process.env.GOOGLE_CLIENT_ID,
         clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-        callbackURL: '/api/auth/google/callback',
+        callbackURL: callbackURL,
       },
       async (accessToken, refreshToken, profile, done) => {
         try {

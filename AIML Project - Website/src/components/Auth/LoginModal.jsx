@@ -13,26 +13,42 @@ const LoginModal = () => {
   const [showPassword, setShowPassword] = useState(false)
   const handleSendOTP = async (e) => {
     e.preventDefault()
+    
     setLoading(true)
-    const result = await sendOTPLogin(email, password)
-    setLoading(false)
-    if (result.success) {
-      if (result.devMode && result.otp) {
-        setDevOTP(result.otp) 
+    try {
+      const result = await sendOTPLogin(email, password)
+      
+      if (result.success) {
+        if (result.devMode && result.otp) {
+          setDevOTP(result.otp) 
+        }
+        setStep(2)
       }
-      setStep(2)
+      // Error already shown by toast in AuthContext
+    } catch (error) {
+      console.error('Login OTP error:', error)
+    } finally {
+      setLoading(false)
     }
   }
   const handleVerifyOTP = async (e) => {
     e.preventDefault()
+    
     setLoading(true)
-    const result = await verifyOTPLogin(email, otp)
-    setLoading(false)
-    if (result.success) {
-      setStep(1)
-      setEmail('')
-      setPassword('')
-      setOTP('')
+    try {
+      const result = await verifyOTPLogin(email, otp)
+      
+      if (result.success) {
+        setStep(1)
+        setEmail('')
+        setPassword('')
+        setOTP('')
+      }
+      // Error already shown by toast in AuthContext
+    } catch (error) {
+      console.error('Verify OTP error:', error)
+    } finally {
+      setLoading(false)
     }
   }
   const handleGoogleLogin = () => {

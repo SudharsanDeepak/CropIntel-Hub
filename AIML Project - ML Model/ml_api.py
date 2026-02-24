@@ -21,6 +21,15 @@ mongo_client = MongoClient(mongo_uri)
 db = mongo_client["market_analyzer"]
 collection = db["sales"]
 
+# Create indexes for better query performance
+try:
+    collection.create_index([("product", 1), ("date", -1)])
+    collection.create_index([("category", 1), ("date", -1)])
+    collection.create_index([("date", -1)])
+    print("✅ MongoDB indexes created successfully")
+except Exception as e:
+    print(f"⚠️ Index creation warning: {e}")
+
 ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "cropintelhub_admin")
 
 def verify_admin_key(api_key: str = Header(None, alias="X-API-Key")):
@@ -85,7 +94,21 @@ def get_latest_products(
     No ML processing - just raw data from database.
     """
     try:
-        pipeline = [
+        # Build optimized pipeline with early filtering
+        pipeline = []
+        
+        # Apply filters first to reduce dataset size
+        match_stage = {}
+        if category:
+            match_stage["category"] = category
+        if search:
+            match_stage["product"] = {"$regex": search, "$options": "i"}
+        
+        if match_stage:
+            pipeline.append({"$match": match_stage})
+        
+        # Sort and group
+        pipeline.extend([
             {"$sort": {"date": -1}},
             {
                 "$group": {
@@ -98,15 +121,13 @@ def get_latest_products(
                     "date": {"$first": "$date"},
                     "source": {"$first": "$source"}
                 }
-            }
-        ]
-        if category:
-            pipeline.insert(0, {"$match": {"category": category}})
-        if search:
-            pipeline.insert(0, {"$match": {"product": {"$regex": search, "$options": "i"}}})
-        results = list(collection.aggregate(pipeline))
-        if limit:
-            results = results[:limit]
+            },
+            {"$limit": limit if limit else 200}  # Default limit to prevent huge responses
+        ])
+        
+        # Execute with timeout
+        results = list(collection.aggregate(pipeline, maxTimeMS=25000))  # 25 second timeout
+        
         products = []
         for item in results:
             products.append({
@@ -118,8 +139,10 @@ def get_latest_products(
                 "date": item["date"].isoformat() if isinstance(item["date"], datetime) else str(item["date"]),
                 "source": item.get("source", "database")
             })
+        
         return products
     except Exception as e:
+        print(f"❌ Error in /products/latest: {str(e)}")
         return {"error": str(e), "products": []}
 @app.get("/products/{product_name}/forecast")
 def get_product_forecast(product_name: str, days: int = 7):

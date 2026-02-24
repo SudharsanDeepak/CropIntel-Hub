@@ -27,12 +27,12 @@ router.get(
   '/google/callback',
   (req, res, next) => {
     if (!isGoogleOAuthConfigured()) {
-      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=oauth_not_configured`);
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=oauth_not_configured`);
     }
     next();
   },
   passport.authenticate('google', { 
-    failureRedirect: process.env.FRONTEND_URL || 'http://localhost:3000',
+    failureRedirect: process.env.FRONTEND_URL || 'http://localhost:5173',
     session: false 
   }),
   (req, res) => {
@@ -42,11 +42,11 @@ router.get(
         JWT_SECRET,
         { expiresIn: '7d' }
       );
-      const frontendURL = process.env.FRONTEND_URL || 'http://localhost:3000'
+      const frontendURL = process.env.FRONTEND_URL || 'http://localhost:5173'
       res.redirect(`${frontendURL}/auth/callback?token=${token}`);
     } catch (error) {
       console.error('Google Callback Error:', error);
-      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:3000'}/login?error=auth_failed`);
+      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed`);
     }
   }
 );

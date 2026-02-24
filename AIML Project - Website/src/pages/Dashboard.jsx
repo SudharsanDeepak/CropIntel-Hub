@@ -2,11 +2,14 @@ import { motion } from 'framer-motion'
 import { 
   TrendingUp, TrendingDown, DollarSign, Package, 
   BarChart3, LineChart, Bell, Zap, Shield, Clock,
-  Target, Award, Users, Globe
+  Target, Award, Users, Globe, Lock
 } from 'lucide-react'
 import { useMarketData } from '../hooks/useMarketData'
 import { Link } from 'react-router-dom'
+import { useAuth } from '../context/AuthContext'
+
 const Dashboard = () => {
+  const { user, setIsLoginOpen, setIsSignupOpen } = useAuth()
   const { useDemandForecast, usePriceForecast, useElasticity } = useMarketData()
   const { data: demandData, isLoading: demandLoading } = useDemandForecast(7)
   const { data: priceData, isLoading: priceLoading } = usePriceForecast(7)
@@ -26,42 +29,48 @@ const Dashboard = () => {
       title: 'Real-Time Price Tracking',
       description: 'Monitor live market prices for fruits and vegetables with instant updates',
       color: 'bg-primary-500',
-      link: '/tracker'
+      link: '/tracker',
+      requiresAuth: true
     },
     {
       icon: TrendingUp,
       title: '7-Day Demand Forecasting',
       description: 'AI-powered predictions for future demand trends using ML models',
       color: 'bg-secondary-500',
-      link: '/forecast'
+      link: '/forecast',
+      requiresAuth: true
     },
     {
       icon: DollarSign,
       title: 'Price Predictions',
       description: 'Accurate price forecasts to help you make informed buying decisions',
       color: 'bg-accent-500',
-      link: '/forecast'
+      link: '/forecast',
+      requiresAuth: true
     },
     {
       icon: BarChart3,
       title: 'Product Comparison',
       description: 'Compare multiple products side-by-side to find the best deals',
       color: 'bg-primary-600',
-      link: '/compare'
+      link: '/compare',
+      requiresAuth: true
     },
     {
       icon: Package,
       title: 'Stock Optimization',
       description: 'Smart recommendations for inventory management and reordering',
       color: 'bg-secondary-600',
-      link: '/analytics'
+      link: '/analytics',
+      requiresAuth: true
     },
     {
       icon: Bell,
       title: 'Price Alerts',
       description: 'Get notified when prices drop or reach your target levels',
       color: 'bg-tertiary-500',
-      link: '/alerts'
+      link: '/alerts',
+      requiresAuth: true
     },
   ]
   const advantages = [
@@ -160,18 +169,29 @@ const Dashboard = () => {
             transition={{ delay: 0.5 }}
             className="flex flex-col sm:flex-row gap-3 sm:gap-4"
           >
-            <Link
-              to="/tracker"
-              className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-white text-primary-600 rounded-xl font-bold hover:bg-primary-50 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-sm sm:text-base tap-target"
-            >
-              Start Tracking
-            </Link>
-            <Link
-              to="/forecast"
-              className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-primary-500/30 backdrop-blur-sm text-white rounded-xl font-bold hover:bg-primary-500/40 transition-all duration-200 border-2 border-white/30 text-sm sm:text-base tap-target"
-            >
-              View Forecasts
-            </Link>
+            {user ? (
+              <>
+                <Link
+                  to="/tracker"
+                  className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-white text-primary-600 rounded-xl font-bold hover:bg-primary-50 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-sm sm:text-base tap-target"
+                >
+                  Start Tracking
+                </Link>
+                <Link
+                  to="/forecast"
+                  className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-primary-500/30 backdrop-blur-sm text-white rounded-xl font-bold hover:bg-primary-500/40 transition-all duration-200 border-2 border-white/30 text-sm sm:text-base tap-target"
+                >
+                  View Forecasts
+                </Link>
+              </>
+            ) : (
+              <button
+                onClick={() => setIsLoginOpen(true)}
+                className="inline-flex items-center justify-center px-6 sm:px-8 py-3 sm:py-4 bg-white text-primary-600 rounded-xl font-bold hover:bg-primary-50 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 text-sm sm:text-base tap-target"
+              >
+                Sign In
+              </button>
+            )}
           </motion.div>
         </div>
       </motion.div>
@@ -213,31 +233,58 @@ const Dashboard = () => {
           <p className="text-lg text-gray-600 max-w-2xl mx-auto">Everything you need to track and predict market trends</p>
         </motion.div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {features.map((feature, index) => (
-            <motion.div
-              key={feature.title}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1 * index }}
-            >
-              <Link
-                to={feature.link}
-                className="feature-card block h-full"
+          {features.map((feature, index) => {
+            const isLocked = !user && feature.requiresAuth
+            
+            return (
+              <motion.div
+                key={feature.title}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 * index }}
               >
-                <div className={`${feature.color} w-14 h-14 rounded-xl flex items-center justify-center mb-5 shadow-md`}>
-                  <feature.icon className="h-7 w-7 text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">
-                  {feature.title}
-                </h3>
-                <p className="text-gray-600 leading-relaxed mb-4">{feature.description}</p>
-                <div className="text-primary-600 font-semibold inline-flex items-center group-hover:translate-x-2 transition-transform">
-                  Learn more 
-                  <span className="ml-1">→</span>
-                </div>
-              </Link>
-            </motion.div>
-          ))}
+                {isLocked ? (
+                  <div
+                    onClick={() => setIsLoginOpen(true)}
+                    className="feature-card block h-full cursor-pointer relative"
+                  >
+                    <div className="absolute top-4 right-4 bg-gray-900/80 backdrop-blur-sm text-white px-3 py-1.5 rounded-full text-xs font-semibold flex items-center gap-1.5 shadow-lg">
+                      <Lock className="h-3.5 w-3.5" />
+                      Sign in to unlock
+                    </div>
+                    <div className={`${feature.color} w-14 h-14 rounded-xl flex items-center justify-center mb-5 shadow-md opacity-60`}>
+                      <feature.icon className="h-7 w-7 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-3">
+                      {feature.title}
+                    </h3>
+                    <p className="text-gray-600 leading-relaxed mb-4">{feature.description}</p>
+                    <div className="text-primary-600 font-semibold inline-flex items-center">
+                      Sign in to access
+                      <span className="ml-1">→</span>
+                    </div>
+                  </div>
+                ) : (
+                  <Link
+                    to={feature.link}
+                    className="feature-card block h-full"
+                  >
+                    <div className={`${feature.color} w-14 h-14 rounded-xl flex items-center justify-center mb-5 shadow-md`}>
+                      <feature.icon className="h-7 w-7 text-white" />
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900 mb-3">
+                      {feature.title}
+                    </h3>
+                    <p className="text-gray-600 leading-relaxed mb-4">{feature.description}</p>
+                    <div className="text-primary-600 font-semibold inline-flex items-center group-hover:translate-x-2 transition-transform">
+                      Learn more 
+                      <span className="ml-1">→</span>
+                    </div>
+                  </Link>
+                )}
+              </motion.div>
+            )
+          })}
         </div>
       </div>
       {}

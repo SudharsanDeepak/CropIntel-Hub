@@ -21,6 +21,8 @@ const createTransporter = () => {
 };
 const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, condition) => {
   try {
+    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+    
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD || 
         process.env.EMAIL_USER === 'your-gmail@gmail.com' ||
         process.env.EMAIL_PASSWORD === 'your-app-password-here') {
@@ -265,7 +267,7 @@ const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, co
             </div>
             
             <div style="text-align: center;">
-              <a href="http://localhost:3000/tracker" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 24px 0;">
+              <a href="${FRONTEND_URL}/tracker" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 24px 0;">
                 View Price Tracker →
               </a>
             </div>
@@ -281,9 +283,9 @@ const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, co
             <div class="footer-brand">CropIntel HUB</div>
             <div class="footer-tagline">AI-powered market insights for fruits & vegetables</div>
             <div class="footer-links">
-              <a href="http://localhost:3000/alerts">Manage Alerts</a>
-              <a href="http://localhost:3000/tracker">Price Tracker</a>
-              <a href="http://localhost:3000/forecast">Forecasts</a>
+              <a href="${FRONTEND_URL}/alerts">Manage Alerts</a>
+              <a href="${FRONTEND_URL}/tracker">Price Tracker</a>
+              <a href="${FRONTEND_URL}/forecast">Forecasts</a>
             </div>
           </div>
         </div>

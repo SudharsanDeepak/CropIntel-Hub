@@ -35,29 +35,48 @@ const SignupModal = () => {
   const handleSendOTP = async (e) => {
     e.preventDefault()
     if (!validate()) return
+    
     setLoading(true)
-    const result = await sendOTPSignup(email)
-    setLoading(false)
-    if (result.success) {
-      if (result.devMode && result.otp) {
-        setDevOTP(result.otp) 
+    try {
+      const result = await sendOTPSignup(email)
+      
+      if (result.success) {
+        if (result.devMode && result.otp) {
+          setDevOTP(result.otp) 
+        }
+        setStep(2)
+      } else {
+        // Error already shown by toast in AuthContext
+        setErrors({ general: result.error || 'Failed to send OTP' })
       }
-      setStep(2)
+    } catch (error) {
+      setErrors({ general: 'An unexpected error occurred' })
+    } finally {
+      setLoading(false)
     }
   }
   const handleVerifyOTP = async (e) => {
     e.preventDefault()
+    
     setLoading(true)
-    const result = await verifyOTPSignup(name, email, password, otp)
-    setLoading(false)
-    if (result.success) {
-      setStep(1)
-      setName('')
-      setEmail('')
-      setPassword('')
-      setConfirmPassword('')
-      setOTP('')
-      setErrors({})
+    try {
+      const result = await verifyOTPSignup(name, email, password, otp)
+      
+      if (result.success) {
+        setStep(1)
+        setName('')
+        setEmail('')
+        setPassword('')
+        setConfirmPassword('')
+        setOTP('')
+        setErrors({})
+      } else {
+        setErrors({ otp: result.error || 'Invalid OTP' })
+      }
+    } catch (error) {
+      setErrors({ otp: 'An unexpected error occurred' })
+    } finally {
+      setLoading(false)
     }
   }
   const handleGoogleSignup = () => {

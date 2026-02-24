@@ -58,6 +58,9 @@ def populate_database():
         'Potato': {'category': 'vegetable', 'price_range': (25, 45), 'seasonal': False},
         'Tomato': {'category': 'vegetable', 'price_range': (30, 80), 'seasonal': False},  # High volatility
         'Onion': {'category': 'vegetable', 'price_range': (25, 60), 'seasonal': False},  # High volatility
+        'Red Onion': {'category': 'vegetable', 'price_range': (25, 60), 'seasonal': False},
+        'White Onion': {'category': 'vegetable', 'price_range': (30, 65), 'seasonal': False},
+        'Yellow Onion': {'category': 'vegetable', 'price_range': (25, 60), 'seasonal': False},
         'Garlic': {'category': 'vegetable', 'price_range': (100, 180), 'seasonal': False},
         'Ginger': {'category': 'vegetable', 'price_range': (80, 150), 'seasonal': False},
         'Carrot': {'category': 'vegetable', 'price_range': (40, 75), 'seasonal': False},

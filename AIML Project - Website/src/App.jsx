@@ -1,4 +1,5 @@
 import { Routes, Route } from 'react-router-dom'
+import { useAuth } from './context/AuthContext'
 import Layout from './components/Layout/Layout'
 import Dashboard from './pages/Dashboard'
 import PriceTracker from './pages/PriceTracker'
@@ -10,14 +11,28 @@ import NotFound from './pages/NotFound'
 import AuthCallback from './pages/AuthCallback'
 import LoginModal from './components/Auth/LoginModal'
 import SignupModal from './components/Auth/SignupModal'
+import ProtectedRoute from './components/Auth/ProtectedRoute'
 import MarketGuide from './components/MarketGuide'
+
 function App() {
+  const { user } = useAuth()
+  
   return (
     <>
-      <Routes>
+      <Routes key={user ? user.id : 'logged-out'}>
         <Route path="/auth/callback" element={<AuthCallback />} />
+        
+        {/* Public Dashboard Route */}
         <Route path="/" element={<Layout />}>
           <Route index element={<Dashboard />} />
+        </Route>
+        
+        {/* Protected Routes */}
+        <Route path="/" element={
+          <ProtectedRoute>
+            <Layout />
+          </ProtectedRoute>
+        }>
           <Route path="tracker" element={<PriceTracker />} />
           <Route path="forecast" element={<Forecast />} />
           <Route path="compare" element={<Compare />} />
@@ -32,4 +47,5 @@ function App() {
     </>
   )
 }
+
 export default App

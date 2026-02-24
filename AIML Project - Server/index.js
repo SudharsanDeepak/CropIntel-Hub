@@ -8,7 +8,7 @@ const connectDB = require("./config/db");
 const Sales = require("./models/Sales");
 const app = express();
 const PORT = process.env.PORT || 5000;
-const ML_API = process.env.ML_API_URL || "https://cropintel-hub-ml.onrender.com"
+const ML_API = process.env.ML_API_URL || "http://localhost:8000"
 
 app.use(cors({
   origin: function(origin, callback) {
@@ -53,16 +53,86 @@ app.use(passport.session());
 const authRoutes = require('./routes/auth');
 const googleAuthRoutes = require('./routes/googleAuth');
 const alertRoutes = require('./routes/alerts');
+const comparisonRoutes = require('./routes/comparisons');
+
 app.use('/api/auth', authRoutes);
 app.use('/api/auth', googleAuthRoutes);
 app.use('/api/alerts', alertRoutes);
+app.use('/api/comparisons', comparisonRoutes);
+
 app.get("/", (req, res) => {
   res.json({
-    status: "success",
-    message: "Node API Running",
-    ml_service: ML_API,
+    status: "Server is running",
+    message: "CropIntel HUB API",
+    endpoints: {
+      health: "/health",
+      products: "/api/products/latest",
+      auth: "/api/auth/*",
+      alerts: "/api/alerts/*"
+    }
   });
 });
+
+// Health check endpoint
+app.get("/health", async (req, res) => {
+  try {
+    const health = {
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      uptime: process.uptime(),
+      environment: process.env.NODE_ENV || 'development',
+      database: {
+        connected: false,
+        status: "unknown"
+      },
+      email: {
+        configured: false,
+        status: "unknown"
+      },
+      mlService: {
+        url: ML_API,
+        status: "unknown"
+      }
+    };
+
+    // Check MongoDB connection
+    const mongoose = require('mongoose');
+    if (mongoose.connection.readyState === 1) {
+      health.database.connected = true;
+      health.database.status = "connected";
+    } else {
+      health.database.status = `disconnected (state: ${mongoose.connection.readyState})`;
+      health.status = "degraded";
+    }
+
+    // Check email configuration
+    if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD &&
+        process.env.EMAIL_USER !== 'your-gmail@gmail.com') {
+      health.email.configured = true;
+      health.email.status = "configured";
+    } else {
+      health.email.status = "not configured (dev mode)";
+    }
+
+    // Check ML service
+    try {
+      const mlResponse = await axios.get(`${ML_API}/health`, { timeout: 5000 });
+      health.mlService.status = "connected";
+    } catch (error) {
+      health.mlService.status = `unreachable: ${error.message}`;
+      health.status = "degraded";
+    }
+
+    const statusCode = health.status === "ok" ? 200 : 503;
+    res.status(statusCode).json(health);
+  } catch (error) {
+    res.status(500).json({
+      status: "error",
+      message: error.message
+    });
+  }
+});
+
 app.get("/api/products/latest", async (req, res) => {
   try {
     const { limit, category, search } = req.query;
@@ -72,12 +142,16 @@ app.get("/api/products/latest", async (req, res) => {
     if (search) params.search = search;
     const response = await axios.get(`${ML_API}/products/latest`, {
       params,
-      timeout: 10000, 
+      timeout: 30000, // Increased to 30 seconds
     });
     res.json(response.data);
   } catch (error) {
     console.error("Products API Error:", error.message);
-    res.status(500).json({ error: "Failed to fetch products", message: error.message });
+    if (error.code === 'ECONNABORTED') {
+      res.status(504).json({ error: "Request timeout - ML service is taking longer than expected" });
+    } else {
+      res.status(500).json({ error: "Failed to fetch products", message: error.message });
+    }
   }
 });
 app.get("/api/products/:productName/forecast", async (req, res) => {
@@ -206,10 +280,23 @@ app.post("/api/sales", async (req, res) => {
 const startServer = async () => {
   try {
     await connectDB();
+    
+    // Global error handler - must be after all routes
+    app.use((err, req, res, next) => {
+      console.error('❌ Unhandled Error:', err);
+      console.error('Error stack:', err.stack);
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error',
+        error: process.env.NODE_ENV === 'development' ? err.message : undefined
+      });
+    });
+    
     app.listen(PORT, () => {
       console.log("========================================");
       console.log(`🚀 Node API running at http://localhost:${PORT}`);
       console.log(`🧠 ML Service connected at ${ML_API}`);
+      console.log(`📊 Health check: http://localhost:${PORT}/health`);
       console.log("========================================");
       
       const { startPriceMonitoring } = require('./services/priceMonitor');

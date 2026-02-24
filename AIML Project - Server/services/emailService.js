@@ -21,6 +21,7 @@ const createTransporter = () => {
 };
 const sendOTPEmail = async (email, otp, purpose) => {
   try {
+    // Check if email is configured
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD || 
         process.env.EMAIL_USER === 'your-gmail@gmail.com' ||
         process.env.EMAIL_PASSWORD === 'your-app-password-here') {
@@ -34,6 +35,7 @@ const sendOTPEmail = async (email, otp, purpose) => {
         otp: otp 
       };
     }
+    
     const transporter = createTransporter();
     let subject, html;
     if (purpose === 'signup') {

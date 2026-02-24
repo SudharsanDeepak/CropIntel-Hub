@@ -130,10 +130,19 @@ export const AuthProvider = ({ children }) => {
     window.location.href = `${API_URL}/api/auth/google`
   }
   const logout = () => {
-    setUser(null)
+    // Clear all auth data from localStorage first
     localStorage.removeItem('user')
     localStorage.removeItem('token')
+    
+    // Clear user state
+    setUser(null)
+    
+    // Show success message
     toast.success('Logged out successfully')
+    
+    // Immediately reload to show login screen
+    // Using replace to prevent back button from showing logged-in state
+    window.location.replace('/')
   }
   const value = {
     user,

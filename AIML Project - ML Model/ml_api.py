@@ -81,8 +81,55 @@ async def startup_event():
     print("=" * 60 + "\n")
 
 @app.get("/")
+def root():
+    return {
+        "status": "ML Service Running",
+        "data_source": "Real-time Market Data + MongoDB",
+        "endpoints": {
+            "health": "/health",
+            "docs": "/docs",
+            "products": "/products/latest"
+        }
+    }
+
+@app.get("/health")
 def health_check():
-    return {"status": "ML Service Running", "data_source": "Real-time Market Data + MongoDB"}
+    """Health check endpoint for monitoring services"""
+    try:
+        # Check MongoDB connection
+        db_status = "connected"
+        product_count = 0
+        try:
+            product_count = len(collection.distinct("product"))
+            db_status = "connected"
+        except Exception as e:
+            db_status = f"error: {str(e)}"
+        
+        # Check if we have recent data
+        recent_data = collection.count_documents({
+            "date": {"$gte": datetime.now() - timedelta(days=7)}
+        })
+        
+        health = {
+            "status": "healthy" if db_status == "connected" else "degraded",
+            "timestamp": datetime.now().isoformat(),
+            "service": "ml_api",
+            "database": {
+                "status": db_status,
+                "products_tracked": product_count,
+                "recent_records": recent_data
+            },
+            "uptime": "running"
+        }
+        
+        return health
+    except Exception as e:
+        return {
+            "status": "error",
+            "timestamp": datetime.now().isoformat(),
+            "service": "ml_api",
+            "error": str(e)
+        }
 @app.get("/products/latest")
 def get_latest_products(
     limit: Optional[int] = Query(None, description="Limit number of products"),

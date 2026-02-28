@@ -1,0 +1,210 @@
+================================================================================
+    BUILD APK WITHOUT ANDROID STUDIO - Command Line Only
+================================================================================
+
+You can build the APK using Gradle commands directly from the terminal!
+
+================================================================================
+PREREQUISITES:
+================================================================================
+
+1. Java JDK 11 or higher installed
+   Download: https://adoptium.net/
+   
+2. Android SDK installed
+   Option A: Install Android Studio (easiest way to get SDK)
+   Option B: Install SDK command-line tools only
+   Download: https://developer.android.com/studio#command-tools
+
+3. Set environment variables:
+   ANDROID_HOME = C:\Users\YourName\AppData\Local\Android\Sdk
+   JAVA_HOME = C:\Program Files\Eclipse Adoptium\jdk-11.x.x
+
+================================================================================
+COMPLETE SETUP COMMANDS (Run in PowerShell):
+================================================================================
+
+# Step 1: Copy website to App folder
+xcopy "AIML Project - Website" "AIML Project - App" /E /I /H /Y
+
+# Step 2: Navigate to App folder
+cd "AIML Project - App"
+
+# Step 3: Install Capacitor
+npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/app @capacitor/haptics @capacitor/keyboard @capacitor/status-bar @capacitor/splash-screen
+
+# Step 4: Initialize Capacitor
+npx cap init "CropIntel HUB" "com.cropintelhub.app" --web-dir=dist
+
+# Step 5: Copy environment file
+copy ..\env.production.template .env.production
+
+# Step 6: Build web app
+npm run build
+
+# Step 7: Add Android platform
+npx cap add android
+
+# Step 8: Sync files
+npx cap sync
+
+# Step 9: Navigate to Android folder
+cd android
+
+# Step 10: Build APK using Gradle (NO ANDROID STUDIO NEEDED!)
+.\gradlew assembleDebug
+
+# Or for release APK:
+# .\gradlew assembleRelease
+
+
+================================================================================
+APK LOCATION:
+================================================================================
+
+Debug APK:
+android\app\build\outputs\apk\debug\app-debug.apk
+
+Release APK:
+android\app\build\outputs\apk\release\app-release-unsigned.apk
+
+
+================================================================================
+INSTALL APK ON PHONE:
+================================================================================
+
+Option 1: Using ADB (USB cable)
+--------------------------------
+adb install app\build\outputs\apk\debug\app-debug.apk
+
+Option 2: Copy to phone
+-----------------------
+1. Copy APK file to phone
+2. Open file manager
+3. Tap APK to install
+4. Allow installation from unknown sources
+
+
+================================================================================
+BUILD COMMANDS EXPLAINED:
+================================================================================
+
+.\gradlew assembleDebug
+- Builds debug APK (for testing)
+- Faster build
+- Larger file size
+- Includes debugging info
+
+.\gradlew assembleRelease
+- Builds release APK (for production)
+- Optimized and minified
+- Smaller file size
+- Needs signing for Play Store
+
+
+================================================================================
+TROUBLESHOOTING:
+================================================================================
+
+Error: "gradlew not found"
+--------------------------
+Make sure you're in the android folder:
+cd "AIML Project - App\android"
+
+Error: "ANDROID_HOME not set"
+------------------------------
+Set environment variable:
+$env:ANDROID_HOME = "C:\Users\YourName\AppData\Local\Android\Sdk"
+
+Error: "Java not found"
+-----------------------
+Install Java JDK 11+:
+https://adoptium.net/
+
+Error: "SDK not found"
+----------------------
+Install Android SDK:
+1. Download command-line tools
+2. Extract to C:\Android\sdk
+3. Set ANDROID_HOME to that path
+
+Error: "Build failed"
+---------------------
+Clean and rebuild:
+.\gradlew clean
+.\gradlew assembleDebug
+
+
+================================================================================
+FULL AUTOMATED SCRIPT (Copy all at once):
+================================================================================
+
+# Navigate to AIML folder
+cd B:\AIML
+
+# Copy website
+xcopy "AIML Project - Website" "AIML Project - App" /E /I /H /Y
+
+# Setup app
+cd "AIML Project - App"
+npm install @capacitor/core @capacitor/cli @capacitor/android @capacitor/app @capacitor/haptics @capacitor/keyboard @capacitor/status-bar @capacitor/splash-screen
+npx cap init "CropIntel HUB" "com.cropintelhub.app" --web-dir=dist
+copy ..\env.production.template .env.production
+npm run build
+npx cap add android
+npx cap sync
+
+# Build APK
+cd android
+.\gradlew assembleDebug
+
+# Done! APK is at: app\build\outputs\apk\debug\app-debug.apk
+
+
+================================================================================
+ADVANTAGES OF COMMAND LINE BUILD:
+================================================================================
+
+✅ No need to install Android Studio (saves 3+ GB)
+✅ Faster build process
+✅ Can automate with scripts
+✅ Works on servers/CI/CD
+✅ Less resource intensive
+✅ Command line control
+
+
+================================================================================
+SIGNING APK FOR PLAY STORE (Optional):
+================================================================================
+
+1. Generate keystore:
+keytool -genkey -v -keystore my-release-key.keystore -alias my-key-alias -keyalg RSA -keysize 2048 -validity 10000
+
+2. Sign APK:
+jarsigner -verbose -sigalg SHA1withRSA -digestalg SHA1 -keystore my-release-key.keystore app-release-unsigned.apk my-key-alias
+
+3. Optimize APK:
+zipalign -v 4 app-release-unsigned.apk app-release.apk
+
+
+================================================================================
+QUICK REBUILD (After code changes):
+================================================================================
+
+cd "B:\AIML\AIML Project - App"
+npm run build
+npx cap sync
+cd android
+.\gradlew assembleDebug
+
+
+================================================================================
+SUCCESS! 🎉
+================================================================================
+
+Your APK is ready at:
+B:\AIML\AIML Project - App\android\app\build\outputs\apk\debug\app-debug.apk
+
+Install it on your phone and enjoy your CropIntel HUB mobile app!
+
+================================================================================

@@ -50,7 +50,17 @@ def fix_database():
     
     try:
         print("\n🔄 Connecting to MongoDB...")
-        client = MongoClient(mongo_uri, serverSelectionTimeoutMS=10000)
+        print(f"   URI: {mongo_uri[:50]}...")
+        client = MongoClient(
+            mongo_uri, 
+            serverSelectionTimeoutMS=30000,  # 30 seconds
+            connectTimeoutMS=30000,
+            socketTimeoutMS=30000,
+            retryWrites=True,
+            w='majority'
+        )
+        # Test connection
+        client.admin.command('ping')
         db = client["market_analyzer"]
         collection = db["sales"]
         print("✅ Connected")

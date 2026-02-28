@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">CropIntel HUB</string>
+    <string name="title_activity_main">CropIntel HUB</string>
+    <string name="package_name">com.cropintelhub.app</string>
+    <string name="custom_url_scheme">com.cropintelhub.app</string>
+</resources>

@@ -1,0 +1,242 @@
+================================================================================
+        SETUP JAVA & ANDROID SDK (Without Android Studio)
+================================================================================
+
+To build APK from command line, you need Java JDK and Android SDK.
+Here's how to install them WITHOUT Android Studio:
+
+================================================================================
+STEP 1: Install Java JDK
+================================================================================
+
+1. Download Java JDK 11 or higher:
+   https://adoptium.net/temurin/releases/
+
+   Choose:
+   - Operating System: Windows
+   - Architecture: x64
+   - Package Type: JDK
+   - Version: 11 (LTS) or 17 (LTS)
+
+2. Run installer (e.g., OpenJDK11U-jdk_x64_windows_hotspot_11.0.x.msi)
+
+3. Install to default location:
+   C:\Program Files\Eclipse Adoptium\jdk-11.x.x
+
+4. Verify installation:
+   java -version
+
+   Should show: openjdk version "11.x.x"
+
+
+================================================================================
+STEP 2: Install Android SDK Command-Line Tools
+================================================================================
+
+Option A: Install Android Studio (Easiest - Includes Everything)
+-----------------------------------------------------------------
+1. Download: https://developer.android.com/studio
+2. Install Android Studio
+3. Open Android Studio
+4. Go to: Tools → SDK Manager
+5. Install:
+   - Android SDK Platform 33
+   - Android SDK Build-Tools 33.0.0
+   - Android SDK Command-line Tools
+6. SDK location: C:\Users\YourName\AppData\Local\Android\Sdk
+
+
+Option B: Install SDK Command-Line Tools Only (Smaller Download)
+-----------------------------------------------------------------
+1. Download command-line tools:
+   https://developer.android.com/studio#command-tools
+   
+   File: commandlinetools-win-xxxxx_latest.zip
+
+2. Create folder:
+   C:\Android\sdk
+
+3. Extract ZIP to:
+   C:\Android\sdk\cmdline-tools\latest\
+
+4. Open PowerShell as Administrator
+
+5. Navigate to tools:
+   cd C:\Android\sdk\cmdline-tools\latest\bin
+
+6. Accept licenses:
+   .\sdkmanager.bat --licenses
+
+7. Install required packages:
+   .\sdkmanager.bat "platform-tools" "platforms;android-33" "build-tools;33.0.0"
+
+8. Verify installation:
+   .\sdkmanager.bat --list
+
+
+================================================================================
+STEP 3: Set Environment Variables
+================================================================================
+
+Windows 10/11:
+--------------
+1. Press Win + X → System
+2. Click "Advanced system settings"
+3. Click "Environment Variables"
+4. Under "System variables", click "New"
+
+Add these variables:
+
+Variable 1:
+-----------
+Name: JAVA_HOME
+Value: C:\Program Files\Eclipse Adoptium\jdk-11.x.x
+(Replace x.x with your version)
+
+Variable 2:
+-----------
+Name: ANDROID_HOME
+Value: C:\Users\YourName\AppData\Local\Android\Sdk
+(Or C:\Android\sdk if you used Option B)
+
+5. Edit "Path" variable, add:
+   %JAVA_HOME%\bin
+   %ANDROID_HOME%\platform-tools
+   %ANDROID_HOME%\cmdline-tools\latest\bin
+
+6. Click OK on all dialogs
+
+7. Restart PowerShell/Command Prompt
+
+
+================================================================================
+STEP 4: Verify Installation
+================================================================================
+
+Open new PowerShell window and run:
+
+# Check Java
+java -version
+javac -version
+
+# Check Android SDK
+adb version
+
+# Check environment variables
+echo $env:JAVA_HOME
+echo $env:ANDROID_HOME
+
+All commands should work without errors.
+
+
+================================================================================
+STEP 5: Build Your APK!
+================================================================================
+
+Now you can run:
+
+build_apk_cli.bat
+
+This will build your APK without opening Android Studio!
+
+
+================================================================================
+TROUBLESHOOTING:
+================================================================================
+
+Problem: "java not found"
+-------------------------
+Solution:
+- Reinstall Java JDK
+- Check JAVA_HOME is set correctly
+- Restart terminal
+
+Problem: "ANDROID_HOME not set"
+-------------------------------
+Solution:
+- Set ANDROID_HOME environment variable
+- Point to SDK location
+- Restart terminal
+
+Problem: "sdkmanager not found"
+-------------------------------
+Solution:
+- Check SDK is installed correctly
+- Verify path: C:\Android\sdk\cmdline-tools\latest\bin
+- Add to PATH environment variable
+
+Problem: "License not accepted"
+-------------------------------
+Solution:
+cd C:\Android\sdk\cmdline-tools\latest\bin
+.\sdkmanager.bat --licenses
+(Accept all licenses)
+
+Problem: "Gradle build failed"
+------------------------------
+Solution:
+- Make sure Java 11+ is installed
+- Check ANDROID_HOME is set
+- Run: .\gradlew clean
+- Then: .\gradlew assembleDebug
+
+
+================================================================================
+DISK SPACE REQUIREMENTS:
+================================================================================
+
+Java JDK: ~300 MB
+Android SDK (minimal): ~1 GB
+Android Studio (full): ~3 GB
+
+Command-line only: ~1.3 GB total
+With Android Studio: ~3.3 GB total
+
+
+================================================================================
+ALTERNATIVE: Use Android Studio (Recommended for Beginners)
+================================================================================
+
+If command-line setup is too complex:
+
+1. Download Android Studio: https://developer.android.com/studio
+2. Install with default settings
+3. Open Android Studio
+4. Let it download SDK automatically
+5. Use the original setup_mobile_app.bat script
+6. Build APK in Android Studio GUI
+
+This is easier but requires more disk space.
+
+
+================================================================================
+QUICK REFERENCE:
+================================================================================
+
+Java Download: https://adoptium.net/
+SDK Download: https://developer.android.com/studio#command-tools
+Android Studio: https://developer.android.com/studio
+
+Environment Variables:
+JAVA_HOME = C:\Program Files\Eclipse Adoptium\jdk-11.x.x
+ANDROID_HOME = C:\Users\YourName\AppData\Local\Android\Sdk
+
+Build Command:
+cd "AIML Project - App\android"
+.\gradlew assembleDebug
+
+APK Location:
+app\build\outputs\apk\debug\app-debug.apk
+
+
+================================================================================
+SUCCESS! 🎉
+================================================================================
+
+Once Java and Android SDK are installed, you can build APKs anytime using:
+
+build_apk_cli.bat
+
+No Android Studio needed!
+
+================================================================================

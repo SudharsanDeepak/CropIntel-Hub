@@ -4,10 +4,14 @@ const User = require('../models/User');
 
 // Determine the correct callback URL based on environment
 const getCallbackURL = () => {
-  // Check if we're in production
+  // If BACKEND_URL is explicitly set, use it (production)
+  if (process.env.BACKEND_URL && process.env.BACKEND_URL !== 'http://localhost:5000') {
+    return `${process.env.BACKEND_URL}/api/auth/google/callback`;
+  }
+  
+  // Check if we're in production by NODE_ENV
   const isProduction = process.env.NODE_ENV === 'production';
   
-  // Use environment-specific URL
   if (isProduction) {
     // Production: Use deployed backend URL
     return `${process.env.BACKEND_URL || 'http://localhost:5000'}/api/auth/google/callback`;

@@ -62,8 +62,7 @@ router.get(
       const redirectToApp = req.session?.redirectToApp || false
       
       if (redirectToApp) {
-        // Mobile app: Send HTML page that triggers deep link
-        // This is more reliable than direct redirect for in-app browsers
+        // Mobile app: Send HTML page that stores token in localStorage and closes
         res.send(`
           <!DOCTYPE html>
           <html>
@@ -99,39 +98,32 @@ router.get(
                 0% { transform: rotate(0deg); }
                 100% { transform: rotate(360deg); }
               }
+              .success {
+                font-size: 48px;
+                margin-bottom: 1rem;
+              }
             </style>
           </head>
           <body>
             <div class="container">
-              <div class="spinner"></div>
+              <div class="success">✓</div>
               <h2>Login Successful!</h2>
-              <p>Returning to app...</p>
+              <p>You can close this window now.</p>
+              <p style="font-size: 0.9em; opacity: 0.8; margin-top: 1rem;">Returning to app...</p>
             </div>
             <script>
-              // Try multiple methods to trigger the deep link
-              const deepLink = 'cropintelhub://auth/callback?token=${token}';
+              console.log('[OAuth Callback] Storing token in localStorage');
               
-              console.log('Triggering deep link:', deepLink);
+              // Store token in localStorage
+              const token = '${token}';
+              localStorage.setItem('token', token);
+              console.log('[OAuth Callback] Token stored successfully');
               
-              // Method 1: Direct window.location
+              // Close the browser after a short delay
               setTimeout(() => {
-                window.location.href = deepLink;
-              }, 500);
-              
-              // Method 2: Create invisible iframe (fallback)
-              setTimeout(() => {
-                const iframe = document.createElement('iframe');
-                iframe.style.display = 'none';
-                iframe.src = deepLink;
-                document.body.appendChild(iframe);
+                console.log('[OAuth Callback] Attempting to close window');
+                window.close();
               }, 1000);
-              
-              // Method 3: Create link and click it (another fallback)
-              setTimeout(() => {
-                const link = document.createElement('a');
-                link.href = deepLink;
-                link.click();
-              }, 1500);
             </script>
           </body>
           </html>

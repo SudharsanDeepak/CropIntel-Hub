@@ -270,11 +270,32 @@ export const AuthProvider = ({ children }) => {
     console.log('[OAuth] Is native platform:', isNativePlatform)
     
     if (isNativePlatform) {
-      // Mobile app: Open OAuth in in-app browser with redirect to deep link
+      // Mobile app: Open OAuth in in-app browser
       const authUrl = `${API_URL}/api/auth/google?redirect=app`
       console.log('[OAuth] Opening browser with URL:', authUrl)
       
       try {
+        // Listen for browser close event
+        const listener = await Browser.addListener('browserFinished', async () => {
+          console.log('[OAuth] Browser closed, checking for token')
+          
+          // Small delay to ensure any pending operations complete
+          await new Promise(resolve => setTimeout(resolve, 500))
+          
+          // Check if we got a token
+          const token = localStorage.getItem('token')
+          if (token) {
+            console.log('[OAuth] Token found after browser close, fetching user')
+            await fetchCurrentUser(token)
+            window.location.href = '/'
+          } else {
+            console.log('[OAuth] No token found after browser close')
+          }
+          
+          // Remove listener
+          listener.remove()
+        })
+        
         await Browser.open({ 
           url: authUrl,
           presentationStyle: 'popover'

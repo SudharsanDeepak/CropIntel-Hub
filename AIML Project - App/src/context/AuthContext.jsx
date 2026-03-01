@@ -35,8 +35,8 @@ export const AuthProvider = ({ children }) => {
         // Try to get the launch URL (if app was opened via deep link)
         try {
           const { url } = await CapacitorApp.getLaunchUrl() || {}
-          if (url && url.includes('auth/callback')) {
-            console.log('[AuthContext] Found launch URL with callback:', url)
+          if (url && url.includes('oauth-success')) {
+            console.log('[AuthContext] Found launch URL with OAuth success:', url)
             const urlObj = new URL(url)
             const deepLinkToken = urlObj.searchParams.get('token')
             if (deepLinkToken) {
@@ -77,22 +77,13 @@ export const AuthProvider = ({ children }) => {
         listener = await CapacitorApp.addListener('appUrlOpen', async (event) => {
           console.log('[DeepLink] Deep link received:', event.url)
           
-          // Handle OAuth callback: cropintelhub://auth/callback?token=xxx
-          if (event.url.includes('auth/callback')) {
+          // Handle OAuth success: cropintelhub://oauth-success?token=xxx
+          if (event.url.includes('oauth-success')) {
             try {
               const url = new URL(event.url)
               const token = url.searchParams.get('token')
-              const error = url.searchParams.get('error')
               
-              console.log('[DeepLink] Callback params - token:', token ? 'present' : 'missing', 'error:', error || 'none')
-              
-              // Close the in-app browser AFTER we have the token
-              try {
-                await Browser.close()
-                console.log('[DeepLink] Browser closed successfully')
-              } catch (error) {
-                console.log('[DeepLink] Browser already closed or not open')
-              }
+              console.log('[DeepLink] OAuth success - token:', token ? 'present' : 'missing')
               
               if (token) {
                 console.log('[DeepLink] Saving token to localStorage')
@@ -105,16 +96,25 @@ export const AuthProvider = ({ children }) => {
                 // Force a page reload to ensure the app shows logged-in state
                 console.log('[DeepLink] Reloading app to show logged-in state')
                 window.location.href = '/'
-              } else if (error) {
+              }
+            } catch (error) {
+              console.error('[DeepLink] Failed to parse OAuth success URL:', error)
+              toast.error('Invalid authentication link')
+            }
+          }
+          
+          // Handle OAuth callback error: cropintelhub://auth/callback?error=xxx
+          if (event.url.includes('auth/callback')) {
+            try {
+              const url = new URL(event.url)
+              const error = url.searchParams.get('error')
+              
+              if (error) {
                 console.error('[DeepLink] OAuth error:', error)
                 toast.error('Authentication failed. Please try again.')
-              } else {
-                console.error('[DeepLink] Deep link missing token and error parameters')
-                toast.error('Invalid authentication link')
               }
             } catch (error) {
               console.error('[DeepLink] Failed to parse deep link:', error)
-              toast.error('Invalid authentication link')
             }
           }
         })
@@ -271,59 +271,11 @@ export const AuthProvider = ({ children }) => {
     
     if (isNativePlatform) {
       // Mobile app: Open OAuth in in-app browser
+      // The deep link listener will handle the callback
       const authUrl = `${API_URL}/api/auth/google?redirect=app`
       console.log('[OAuth] Opening browser with URL:', authUrl)
       
       try {
-        let tokenFound = false
-        
-        // Listen for URL changes in the browser to intercept the callback
-        const urlListener = await Browser.addListener('browserPageLoaded', async (info) => {
-          console.log('[OAuth] Browser page loaded:', info.url)
-          
-          // Check if this is our special callback URL
-          if (info.url && info.url.includes('/__oauth_callback__')) {
-            console.log('[OAuth] Callback URL detected, extracting token')
-            
-            try {
-              const url = new URL(info.url)
-              const token = url.searchParams.get('token')
-              
-              if (token && !tokenFound) {
-                tokenFound = true
-                console.log('[OAuth] Token extracted from URL')
-                
-                // Store token
-                localStorage.setItem('token', token)
-                
-                // Close browser
-                await Browser.close()
-                
-                // Fetch user
-                await fetchCurrentUser(token)
-                
-                // Reload app
-                window.location.href = '/'
-              }
-            } catch (error) {
-              console.error('[OAuth] Failed to parse callback URL:', error)
-            }
-          }
-        })
-        
-        // Listen for browser close event as fallback
-        const closeListener = await Browser.addListener('browserFinished', async () => {
-          console.log('[OAuth] Browser closed')
-          
-          // Clean up listeners
-          urlListener.remove()
-          closeListener.remove()
-          
-          if (!tokenFound) {
-            console.log('[OAuth] No token found')
-          }
-        })
-        
         await Browser.open({ 
           url: authUrl,
           presentationStyle: 'popover'

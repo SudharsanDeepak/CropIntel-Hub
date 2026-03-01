@@ -100,8 +100,8 @@ router.get(
             <script>
               console.log('[OAuth Callback] Redirecting with token');
               
-              // Redirect to special URL that app can intercept
-              window.location.href = 'https://localhost/__oauth_callback__?token=${token}';
+              // Use custom app scheme that only our app handles
+              window.location.href = 'cropintelhub://oauth-success?token=${token}';
             </script>
           </body>
           </html>

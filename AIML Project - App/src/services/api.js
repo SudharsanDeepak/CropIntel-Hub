@@ -9,10 +9,17 @@ const api = axiosInstance
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
+    // Handle case where error object might be undefined or malformed
+    if (!error) {
+      console.error('Unknown error occurred')
+      return Promise.reject(new Error('An unknown error occurred'))
+    }
+    
     if (error.code === 'ECONNABORTED') {
       console.error('Request timeout - ML API is processing large dataset')
       return Promise.reject(new Error('Request timeout. The server is processing a large dataset. Please try again.'))
     }
+    
     const message = error.userMessage || error.response?.data?.message || error.message || 'Something went wrong'
     return Promise.reject(new Error(message))
   }

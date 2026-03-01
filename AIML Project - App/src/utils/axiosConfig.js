@@ -49,6 +49,14 @@ axiosInstance.interceptors.response.use(
     return response
   },
   (error) => {
+    // Handle case where error object might be undefined or malformed
+    if (!error) {
+      console.error('[Axios] Unknown error occurred')
+      const unknownError = new Error('An unknown error occurred')
+      unknownError.userMessage = 'An unknown error occurred. Please try again.'
+      return Promise.reject(unknownError)
+    }
+    
     console.error('[Axios] Response error:', {
       message: error.message,
       code: error.code,

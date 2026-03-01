@@ -2,9 +2,11 @@ import { NavLink } from 'react-router-dom'
 import { X, Home, DollarSign, TrendingUp, GitCompare, BarChart3, Bell, Lock } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../../context/AuthContext'
+import { Capacitor } from '@capacitor/core'
 
 const Sidebar = ({ isOpen, onClose }) => {
   const { user, setIsLoginOpen } = useAuth()
+  const isNative = Capacitor.isNativePlatform()
   
   const navItems = [
     { icon: Home, label: 'Dashboard', path: '/', public: true },
@@ -40,10 +42,11 @@ const Sidebar = ({ isOpen, onClose }) => {
       {}
       <aside
         className={`
-          fixed top-16 left-0 bottom-0 w-64 bg-white border-r border-gray-200 z-40 shadow-lg lg:shadow-none
+          fixed left-0 bottom-0 w-64 bg-white border-r border-gray-200 z-40 shadow-lg lg:shadow-none
           transform transition-transform duration-300 ease-in-out
           ${isOpen ? 'translate-x-0' : '-translate-x-full'}
           lg:translate-x-0
+          ${isNative ? 'top-[calc(4rem+env(safe-area-inset-top))]' : 'top-16'}
         `}
       >
         <div className="h-full overflow-y-auto py-6">

@@ -40,14 +40,6 @@ export const AuthProvider = ({ children }) => {
       listener = await CapacitorApp.addListener('appUrlOpen', async (event) => {
         console.log('[DeepLink] Deep link received:', event.url)
         
-        // Close the in-app browser immediately
-        try {
-          await Browser.close()
-          console.log('[DeepLink] Browser closed successfully')
-        } catch (error) {
-          console.log('[DeepLink] Browser already closed or not open')
-        }
-        
         // Handle OAuth callback: cropintelhub://auth/callback?token=xxx
         if (event.url.includes('auth/callback')) {
           try {
@@ -57,13 +49,25 @@ export const AuthProvider = ({ children }) => {
             
             console.log('[DeepLink] Callback params - token:', token ? 'present' : 'missing', 'error:', error || 'none')
             
+            // Close the in-app browser AFTER we have the token
+            try {
+              await Browser.close()
+              console.log('[DeepLink] Browser closed successfully')
+            } catch (error) {
+              console.log('[DeepLink] Browser already closed or not open')
+            }
+            
             if (token) {
               console.log('[DeepLink] Saving token to localStorage')
               localStorage.setItem('token', token)
               console.log('[DeepLink] Fetching user data')
+              
+              // Fetch user and wait for it to complete
               await fetchCurrentUser(token)
-              toast.success('Welcome back!')
-              setIsLoginOpen(false)
+              
+              // Force a page reload to ensure the app shows logged-in state
+              console.log('[DeepLink] Reloading app to show logged-in state')
+              window.location.href = '/'
             } else if (error) {
               console.error('[DeepLink] OAuth error:', error)
               toast.error('Authentication failed. Please try again.')

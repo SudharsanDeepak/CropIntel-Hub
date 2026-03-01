@@ -106,16 +106,6 @@ router.get(
           </body>
           </html>
         `)
-              
-              // Close the browser after a short delay
-              setTimeout(() => {
-                console.log('[OAuth Callback] Attempting to close window');
-                window.close();
-              }, 1000);
-            </script>
-          </body>
-          </html>
-        `)
       } else {
         // Web: Redirect to website
         const frontendURL = process.env.FRONTEND_URL || 'http://localhost:5173'

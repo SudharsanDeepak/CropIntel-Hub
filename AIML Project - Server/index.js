@@ -17,6 +17,7 @@ app.use(cors({
       'http://localhost:5173',
       'http://127.0.0.1:3000',
       'http://127.0.0.1:5173',
+      'https://localhost',
       'https://cropintel-hub.vercel.app',
       process.env.FRONTEND_URL
     ].filter(Boolean);
@@ -27,8 +28,8 @@ app.use(cors({
       return;
     }
     
-    // Allow Capacitor apps (they use capacitor:// or https:// scheme)
-    if (origin.startsWith('capacitor://') || origin.startsWith('ionic://')) {
+    // Allow Capacitor apps (they use capacitor://, ionic://, or https://localhost)
+    if (origin.startsWith('capacitor://') || origin.startsWith('ionic://') || origin === 'https://localhost') {
       callback(null, true);
       return;
     }

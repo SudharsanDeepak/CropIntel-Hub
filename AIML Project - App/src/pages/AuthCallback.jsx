@@ -29,12 +29,17 @@ const AuthCallback = () => {
           })
           if (response.data.success) {
             const user = response.data.user
+            setUser(user)
             localStorage.setItem('user', JSON.stringify(user))
             toast.success('Welcome!')
             navigate('/')
+          } else {
+            throw new Error('Failed to fetch user')
           }
         } catch (error) {
           console.error('Auth callback error:', error)
+          localStorage.removeItem('token')
+          localStorage.removeItem('user')
           toast.error('Authentication failed')
           navigate('/')
         }
@@ -43,7 +48,7 @@ const AuthCallback = () => {
       }
     }
     handleCallback()
-  }, [searchParams, navigate])
+  }, [searchParams, navigate, setUser])
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="text-center">

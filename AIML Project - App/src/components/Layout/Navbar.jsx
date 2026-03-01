@@ -2,15 +2,19 @@ import { Link } from 'react-router-dom'
 import { Menu, Bell, RefreshCw, TrendingUp, LogOut, User } from 'lucide-react'
 import { useMarketData } from '../../hooks/useMarketData'
 import { useAuth } from '../../context/AuthContext'
+import { Capacitor } from '@capacitor/core'
+
 const Navbar = ({ onMenuClick }) => {
   const { useUpdateMarketData } = useMarketData()
   const { user, logout, setIsLoginOpen, setIsSignupOpen } = useAuth()
   const updateMutation = useUpdateMarketData()
+  const isNative = Capacitor.isNativePlatform()
+  
   const handleRefresh = () => {
     updateMutation.mutate()
   }
   return (
-    <nav className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm backdrop-blur-sm bg-white/95">
+    <nav className={`fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200 shadow-sm backdrop-blur-sm bg-white/95 ${isNative ? 'safe-area-top' : ''}`}>
       <div className="lg:pl-0">
         <div className="flex items-center justify-between h-16 px-4 sm:px-6 lg:px-8">
           {}

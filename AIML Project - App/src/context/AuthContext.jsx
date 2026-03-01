@@ -38,13 +38,14 @@ export const AuthProvider = ({ children }) => {
 
     const setupDeepLinks = async () => {
       listener = await CapacitorApp.addListener('appUrlOpen', async (event) => {
-        console.log('Deep link received:', event.url)
+        console.log('[DeepLink] Deep link received:', event.url)
         
         // Close the in-app browser immediately
         try {
           await Browser.close()
+          console.log('[DeepLink] Browser closed successfully')
         } catch (error) {
-          console.log('Browser already closed or not open')
+          console.log('[DeepLink] Browser already closed or not open')
         }
         
         // Handle OAuth callback: cropintelhub://auth/callback?token=xxx
@@ -54,21 +55,24 @@ export const AuthProvider = ({ children }) => {
             const token = url.searchParams.get('token')
             const error = url.searchParams.get('error')
             
+            console.log('[DeepLink] Callback params - token:', token ? 'present' : 'missing', 'error:', error || 'none')
+            
             if (token) {
-              console.log('Token received from OAuth:', token)
+              console.log('[DeepLink] Saving token to localStorage')
               localStorage.setItem('token', token)
+              console.log('[DeepLink] Fetching user data')
               await fetchCurrentUser(token)
               toast.success('Welcome back!')
               setIsLoginOpen(false)
             } else if (error) {
-              console.error('OAuth error:', error)
+              console.error('[DeepLink] OAuth error:', error)
               toast.error('Authentication failed. Please try again.')
             } else {
-              console.error('Deep link missing token and error parameters')
+              console.error('[DeepLink] Deep link missing token and error parameters')
               toast.error('Invalid authentication link')
             }
           } catch (error) {
-            console.error('Failed to parse deep link:', error)
+            console.error('[DeepLink] Failed to parse deep link:', error)
             toast.error('Invalid authentication link')
           }
         }
@@ -87,26 +91,31 @@ export const AuthProvider = ({ children }) => {
   const fetchCurrentUser = async (token) => {
     try {
       setLoading(true)
+      console.log('[AuthContext] Fetching current user with token:', token ? 'present' : 'missing')
       const response = await axios.get(`${API_URL}/api/auth/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       })
+      console.log('[AuthContext] User fetch response:', response.data)
       if (response.data.success) {
         setUser(response.data.user)
         localStorage.setItem('user', JSON.stringify(response.data.user))
+        console.log('[AuthContext] User set successfully:', response.data.user.email)
       } else {
         // Invalid token
+        console.log('[AuthContext] Invalid token, clearing auth data')
         localStorage.removeItem('token')
         localStorage.removeItem('user')
       }
     } catch (error) {
-      console.error('Failed to fetch user:', error)
+      console.error('[AuthContext] Failed to fetch user:', error)
       localStorage.removeItem('token')
       localStorage.removeItem('user')
       setUser(null)
     } finally {
       setLoading(false)
+      console.log('[AuthContext] Loading state set to false')
     }
   }
   const sendOTPSignup = async (email) => {

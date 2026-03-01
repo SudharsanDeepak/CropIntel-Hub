@@ -1,0 +1,138 @@
+====================================================================
+FIX YOUR NETWORK ERROR - STEP BY STEP
+====================================================================
+
+Follow these steps EXACTLY in order:
+
+====================================================================
+STEP 1: DEPLOY BACKEND TO RENDER
+====================================================================
+
+1. Open browser
+2. Go to: https://dashboard.render.com
+3. Login with your credentials
+4. You should see a list of services
+5. Find the service named: "cropintel-hub-bnd"
+6. Click on it to open
+7. Look for a button that says "Manual Deploy" (top right)
+8. Click "Manual Deploy"
+9. A dropdown will appear
+10. Select "Deploy latest commit"
+11. Wait for deployment to complete (2-5 minutes)
+12. You'll see "Deploy succeeded" when done
+
+VERIFY IT WORKED:
+- Open new browser tab
+- Go to: https://cropintel-hub-bnd.onrender.com/health
+- You should see JSON with "status": "ok"
+- If you see this, backend is deployed! ✓
+
+====================================================================
+STEP 2: REBUILD THE MOBILE APP
+====================================================================
+
+1. Open Command Prompt or PowerShell
+2. Navigate to your project folder: B:\AIML
+3. Run this command:
+   .\BUILD_MOBILE_APP_FINAL.bat
+
+4. Wait for build to complete (5-10 minutes)
+5. You'll see "BUILD COMPLETE!" when done
+6. APK will be at:
+   AIML Project - App\android\app\build\outputs\apk\debug\app-debug.apk
+
+====================================================================
+STEP 3: INSTALL NEW APK ON DEVICE
+====================================================================
+
+1. Connect your Android device to computer via USB
+   OR
+   Transfer APK to device via any method
+
+2. On your device:
+   - Go to Settings → Apps
+   - Find "CropIntel HUB" app
+   - Tap on it
+   - Tap "Uninstall"
+   - Confirm uninstall
+
+3. Install new APK:
+   - Open file manager on device
+   - Navigate to where you copied the APK
+   - Tap on app-debug.apk
+   - Tap "Install"
+   - Allow installation from unknown sources if prompted
+   - Wait for installation to complete
+
+====================================================================
+STEP 4: TEST THE APP
+====================================================================
+
+1. Open the CropIntel HUB app
+2. You should see the dashboard
+3. Click "Login" button (top right)
+4. Click "Continue with Google"
+5. Select your Gmail account
+6. Browser should close automatically
+7. App should reload
+8. You should be logged in!
+9. Your name should appear in the navbar
+
+====================================================================
+IF IT STILL DOESN'T WORK:
+====================================================================
+
+Connect device to computer and check logs:
+
+1. Enable USB Debugging on device:
+   - Settings → About Phone
+   - Tap "Build Number" 7 times
+   - Go back → Developer Options
+   - Enable "USB Debugging"
+
+2. Connect device to computer via USB
+
+3. Open Chrome browser on computer
+
+4. Go to: chrome://inspect
+
+5. You should see your device listed
+
+6. Click "inspect" next to CropIntel HUB
+
+7. Open the "Console" tab
+
+8. Try to login again
+
+9. Look for error messages in console
+
+10. Take screenshot of console and share it
+
+====================================================================
+COMMON ISSUES:
+====================================================================
+
+ISSUE: "Deploy failed" on Render
+SOLUTION: Check Render logs for errors, might need to fix code
+
+ISSUE: Build fails with error
+SOLUTION: Make sure you're in the correct directory (B:\AIML)
+
+ISSUE: Can't install APK on device
+SOLUTION: Enable "Install from unknown sources" in device settings
+
+ISSUE: App still shows network error after all steps
+SOLUTION: Backend might be sleeping, wait 60 seconds and try again
+
+====================================================================
+NEED HELP?
+====================================================================
+
+If you've followed ALL steps and it still doesn't work:
+
+1. Take screenshot of Render deployment page
+2. Take screenshot of build output
+3. Take screenshot of chrome://inspect console
+4. Share all screenshots
+
+====================================================================

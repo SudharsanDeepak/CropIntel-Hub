@@ -1,0 +1,184 @@
+====================================================================
+USB DEBUGGING STEPS - FIND THE EXACT ERROR
+====================================================================
+
+STEP 1: ENABLE USB DEBUGGING ON YOUR ANDROID DEVICE
+====================================================================
+
+1. Open Settings on your Android device
+2. Scroll down and tap "About Phone" (or "About Device")
+3. Find "Build Number" 
+4. Tap "Build Number" 7 times rapidly
+5. You'll see a message: "You are now a developer!"
+6. Go back to main Settings
+7. You should now see "Developer Options" (near the bottom)
+8. Tap "Developer Options"
+9. Find "USB Debugging" and toggle it ON
+10. Confirm "Allow USB Debugging" if prompted
+
+====================================================================
+STEP 2: CONNECT DEVICE TO COMPUTER
+====================================================================
+
+1. Connect your Android device to computer using USB cable
+2. On your device, you'll see a popup: "Allow USB debugging?"
+3. Check "Always allow from this computer"
+4. Tap "OK"
+
+====================================================================
+STEP 3: OPEN CHROME DEVTOOLS
+====================================================================
+
+1. On your computer, open Google Chrome browser
+2. In the address bar, type: chrome://inspect
+3. Press Enter
+4. You should see a page titled "Devices"
+5. Wait a few seconds for your device to appear
+6. You should see your device name listed
+7. Under your device, you should see "CropIntel HUB" (if app is open)
+
+If you DON'T see your device:
+- Make sure USB debugging is enabled
+- Try unplugging and replugging the USB cable
+- Try a different USB cable
+- Make sure you tapped "OK" on the "Allow USB debugging?" popup
+
+====================================================================
+STEP 4: INSPECT THE APP
+====================================================================
+
+1. On the chrome://inspect page
+2. Find "CropIntel HUB" under your device name
+3. Click the "inspect" button next to it
+4. A new window will open - this is Chrome DevTools
+5. You'll see several tabs: Elements, Console, Sources, Network, etc.
+
+====================================================================
+STEP 5: VIEW CONSOLE LOGS
+====================================================================
+
+1. In the DevTools window, click the "Console" tab
+2. You should see log messages from your app
+3. Look for messages with:
+   - [Axios] prefix
+   - [CapacitorHttp] prefix
+   - [AuthContext] prefix
+   - [DeepLink] prefix
+   - Red error messages
+
+====================================================================
+STEP 6: REPRODUCE THE ERROR
+====================================================================
+
+1. With DevTools Console open, go back to your device
+2. In the CropIntel HUB app, try to login:
+   - Tap "Login" button
+   - Tap "Continue with Google"
+   - Select your Gmail account
+3. Watch the Console in DevTools on your computer
+4. You'll see logs appearing in real-time
+
+====================================================================
+STEP 7: IDENTIFY THE ERROR
+====================================================================
+
+Look for these specific error patterns:
+
+ERROR PATTERN 1: Network Error
+------------------------------
+[Axios] Response error: { code: "ERR_NETWORK", ... }
+OR
+[CapacitorHttp] Native request error: ...
+
+This means: App can't reach the backend server
+
+ERROR PATTERN 2: CORS Error
+---------------------------
+Access to XMLHttpRequest at '...' has been blocked by CORS policy
+OR
+No 'Access-Control-Allow-Origin' header
+
+This means: Backend is blocking the request
+
+ERROR PATTERN 3: Timeout Error
+------------------------------
+[Axios] Response error: { code: "ECONNABORTED", ... }
+
+This means: Request took too long (backend slow or down)
+
+ERROR PATTERN 4: 401 Unauthorized
+---------------------------------
+[Axios] Response error: { status: 401, ... }
+
+This means: Token is invalid or missing
+
+ERROR PATTERN 5: 500 Server Error
+---------------------------------
+[Axios] Response error: { status: 500, ... }
+
+This means: Backend server crashed or has an error
+
+====================================================================
+STEP 8: COPY THE ERROR LOGS
+====================================================================
+
+1. In the Console tab, find the error messages
+2. Right-click on the error message
+3. Select "Copy message"
+4. Paste it into a text file or share it with me
+
+OR
+
+Take a screenshot:
+1. Make sure the error is visible in the Console
+2. Press Windows Key + Shift + S (on Windows)
+3. Select the area with the error
+4. Save the screenshot
+
+====================================================================
+STEP 9: CHECK NETWORK TAB
+====================================================================
+
+1. In DevTools, click the "Network" tab
+2. Make sure "Preserve log" is checked
+3. On your device, try to login again
+4. In the Network tab, you'll see all network requests
+5. Look for requests to "cropintel-hub-bnd.onrender.com"
+6. Click on any failed requests (they'll be red)
+7. Look at the "Headers" and "Response" tabs
+8. Take screenshots of any failed requests
+
+====================================================================
+WHAT TO SHARE WITH ME:
+====================================================================
+
+Please share:
+1. Screenshot of Console tab showing error messages
+2. Screenshot of Network tab showing failed requests
+3. Copy-paste of any error messages you see
+4. Tell me what happens when you try to login
+
+====================================================================
+COMMON ISSUES AND QUICK FIXES:
+====================================================================
+
+ISSUE: Device not showing in chrome://inspect
+FIX: 
+- Unplug and replug USB cable
+- Make sure USB debugging is enabled
+- Try different USB port
+- Install Android USB drivers
+
+ISSUE: "inspect" button is grayed out
+FIX:
+- Make sure app is open on device
+- Close and reopen the app
+- Refresh chrome://inspect page
+
+ISSUE: DevTools shows blank screen
+FIX:
+- Close DevTools window
+- Click "inspect" again
+- Try restarting Chrome browser
+
+====================================================================

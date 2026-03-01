@@ -1,0 +1,263 @@
+====================================================================
+COMPLETE MOBILE APP FIX GUIDE - NETWORK ERROR SOLUTION
+====================================================================
+
+PROBLEM:
+--------
+Mobile app shows "Failed to fetch" network errors after OAuth login.
+Backend is running but mobile app can't communicate with it.
+
+ROOT CAUSES IDENTIFIED:
+-----------------------
+1. CORS configuration blocking mobile app requests
+2. Axios not configured for Capacitor mobile apps
+3. No timeout or retry logic for slow network
+4. Backend might not be deployed with latest fixes
+
+====================================================================
+SOLUTIONS APPLIED:
+====================================================================
+
+FIX 1: BACKEND CORS CONFIGURATION ✓
+------------------------------------
+Updated server to allow mobile app requests:
+- Allows requests with no origin (mobile apps)
+- Allows capacitor:// and ionic:// schemes
+- File: AIML Project - Server/index.js
+- Commit: 6d24612
+
+FIX 2: AXIOS CONFIGURATION FOR MOBILE ✓
+----------------------------------------
+Created mobile-friendly axios instance:
+- 30 second timeout
+- Mobile platform headers
+- Better error handling
+- Detailed logging
+- File: AIML Project - App/src/utils/axiosConfig.js
+- Commit: 46dfba9
+
+FIX 3: IMPROVED ERROR HANDLING ✓
+---------------------------------
+- Network errors don't clear token (allows retry)
+- User-friendly error messages
+- Detailed console logging for debugging
+- Files: AuthContext.jsx, AuthCallback.jsx
+
+====================================================================
+DEPLOYMENT STEPS (CRITICAL):
+====================================================================
+
+STEP 1: VERIFY BACKEND IS DEPLOYED
+-----------------------------------
+The backend MUST have the latest CORS fix deployed!
+
+Check deployment status:
+1. Go to: https://dashboard.render.com
+2. Find service: cropintel-hub-bnd
+3. Check "Latest Deploy" timestamp
+4. Should be AFTER: March 1, 2026 (today)
+
+If NOT deployed or deployed BEFORE today:
+1. Click "Manual Deploy"
+2. Select "Deploy latest commit"
+3. Wait for "Deploy succeeded"
+4. Verify: https://cropintel-hub-bnd.onrender.com/health
+
+STEP 2: BUILD NEW APK WITH FIXES
+---------------------------------
+Run: .\BUILD_MOBILE_APP_FINAL.bat
+
+This will:
+- Install required packages
+- Build production bundle with new axios config
+- Sync with Capacitor
+- Generate APK
+
+APK Location:
+AIML Project - App\android\app\build\outputs\apk\debug\app-debug.apk
+
+STEP 3: INSTALL AND TEST
+-------------------------
+1. Uninstall old app from device (important!)
+2. Install new APK
+3. Open app
+4. Try OAuth login
+5. Check console logs in chrome://inspect
+
+====================================================================
+TESTING CHECKLIST:
+====================================================================
+
+TEST 1: Backend Health Check
+-----------------------------
+Open browser: https://cropintel-hub-bnd.onrender.com/health
+Expected: JSON with "status": "ok"
+
+If you see this, backend is running!
+
+TEST 2: Mobile App Network Test
+--------------------------------
+1. Open app
+2. Connect device to chrome://inspect
+3. Open Console tab
+4. Try to login
+5. Look for [Axios] logs
+
+Expected logs:
+- [Axios] Request: { method: 'get', url: '/api/auth/me', ... }
+- [Axios] Response: { status: 200, ... }
+
+If you see these, network is working!
+
+TEST 3: OAuth Login Test
+-------------------------
+1. Click "Login"
+2. Click "Continue with Google"
+3. Select Gmail account
+4. Browser closes
+5. App reloads
+6. You should be logged in!
+
+Expected: Your name appears in navbar
+
+====================================================================
+DEBUGGING NETWORK ERRORS:
+====================================================================
+
+IF YOU STILL SEE "NETWORK ERROR":
+----------------------------------
+
+STEP 1: Check Backend Deployment
+Run: .\CHECK_BACKEND_STATUS.bat
+- Should show "status": "ok"
+- If timeout or error, backend not deployed
+
+STEP 2: Check Console Logs
+Connect to chrome://inspect and look for:
+
+[Axios] Request logs:
+- Shows URL being called
+- Shows headers
+- Shows if request is being sent
+
+[Axios] Response error logs:
+- Shows error code (ERR_NETWORK, ECONNABORTED, etc.)
+- Shows status code if any
+- Shows error message
+
+Common Error Codes:
+- ERR_NETWORK: Can't reach backend (CORS or network issue)
+- ECONNABORTED: Request timeout (backend slow or down)
+- 401: Authentication failed (token invalid)
+- 500: Backend server error
+
+STEP 3: Test CORS
+Run: .\TEST_BACKEND_CORS.bat
+- Should show CORS headers
+- If no CORS headers, backend not deployed with fix
+
+STEP 4: Wake Up Backend
+Render free tier sleeps after 15 minutes:
+1. Visit: https://cropintel-hub-bnd.onrender.com/health
+2. Wait 30-60 seconds
+3. Try app again
+
+====================================================================
+COMMON ISSUES AND SOLUTIONS:
+====================================================================
+
+ISSUE: "Failed to fetch price forecast: Network Error"
+SOLUTION: This is a different API call (not auth related)
+- Check if ML API is running
+- Check VITE_ML_API_URL in .env.production
+- This won't prevent login, just shows on dashboard
+
+ISSUE: OAuth redirects but doesn't log in
+SOLUTION: 
+- Check [DeepLink] logs in console
+- Verify token is present in deep link
+- Check if fetchCurrentUser is being called
+- Check if window.location.href = '/' is called
+
+ISSUE: App shows "Loading..." forever
+SOLUTION:
+- fetchCurrentUser is stuck
+- Check network logs
+- Backend might be sleeping
+- Try restarting app
+
+ISSUE: Backend shows "Deploy succeeded" but still errors
+SOLUTION:
+- Wait 1-2 minutes for service to fully start
+- Check Render logs for runtime errors
+- Verify environment variables are set
+- Try manual restart from Render dashboard
+
+====================================================================
+ENVIRONMENT VARIABLES CHECK:
+====================================================================
+
+MOBILE APP (.env.production):
+------------------------------
+✓ VITE_API_URL=https://cropintel-hub-bnd.onrender.com
+✓ VITE_ML_API_URL=https://cropintel-hub-ml.onrender.com
+✓ VITE_GROQ_API_KEY=gsk_...
+✓ VITE_GOOGLE_CLIENT_ID=...
+
+BACKEND (Render Dashboard):
+----------------------------
+✓ MONGO_URI (MongoDB connection)
+✓ JWT_SECRET (any random string)
+✓ SESSION_SECRET (any random string)
+✓ FRONTEND_URL (your domain)
+✓ ML_API_URL (ML service URL)
+✓ GOOGLE_CLIENT_ID (for OAuth)
+✓ GOOGLE_CLIENT_SECRET (for OAuth)
+
+====================================================================
+FINAL CHECKLIST:
+====================================================================
+
+Before testing, verify:
+□ Backend deployed on Render (check timestamp)
+□ Backend health check returns "ok"
+□ New APK built with latest code
+□ Old app uninstalled from device
+□ New APK installed on device
+□ Device has internet connection
+□ USB debugging enabled (for logs)
+□ Chrome DevTools connected (chrome://inspect)
+
+====================================================================
+SUCCESS INDICATORS:
+====================================================================
+
+You'll know it's working when:
+✓ No "Network Error" messages
+✓ [Axios] logs show successful requests
+✓ OAuth login completes without loop
+✓ Your name appears in navbar after login
+✓ Dashboard loads with market data
+✓ Status bar doesn't overlap content
+
+====================================================================
+SUPPORT:
+====================================================================
+
+If still not working after all steps:
+1. Share Render deployment logs
+2. Share chrome://inspect console logs
+3. Share screenshots of errors
+4. Verify all environment variables
+5. Check if backend is accessible from browser
+
+====================================================================
+COMMITS:
+====================================================================
+
+1. 6d24612 - Fix CORS to allow mobile app requests (BACKEND)
+2. 46dfba9 - Add axios config with mobile-friendly settings (FRONTEND)
+
+Both must be deployed/built for the fix to work!
+
+====================================================================

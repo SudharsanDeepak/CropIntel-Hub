@@ -1,0 +1,84 @@
+====================================================================
+DIAGNOSE YOUR NETWORK ERROR ISSUE
+====================================================================
+
+You're seeing "Network error. Please check your connection."
+
+This means the mobile app CANNOT reach the backend server.
+
+====================================================================
+CHECKLIST - Answer these questions:
+====================================================================
+
+QUESTION 1: Did you deploy the backend to Render?
+--------------------------------------------------
+After I made the CORS fix, you MUST deploy it to Render.
+
+To check:
+1. Go to: https://dashboard.render.com
+2. Find service: cropintel-hub-bnd
+3. Look at "Latest Deploy" timestamp
+4. Is it from TODAY (March 1, 2026)?
+
+If NO → You MUST deploy the backend first!
+If YES → Continue to Question 2
+
+QUESTION 2: Did you rebuild the APK?
+-------------------------------------
+After I made the axios fix, you MUST rebuild the APK.
+
+To check:
+- Did you run .\BUILD_MOBILE_APP_FINAL.bat?
+- Did you install the NEW APK on your device?
+- Did you uninstall the old app first?
+
+If NO → You MUST rebuild and reinstall!
+If YES → Continue to Question 3
+
+QUESTION 3: Is the backend actually running?
+---------------------------------------------
+Open browser and go to:
+https://cropintel-hub-bnd.onrender.com/health
+
+Do you see JSON with "status": "ok"?
+
+If NO → Backend is down or sleeping, wait 60 seconds and try again
+If YES → Continue to Question 4
+
+QUESTION 4: Can you access the backend from your phone?
+--------------------------------------------------------
+On your phone's browser, go to:
+https://cropintel-hub-bnd.onrender.com/health
+
+Do you see JSON with "status": "ok"?
+
+If NO → Your phone can't reach the backend (network/firewall issue)
+If YES → There's a CORS or app configuration issue
+
+====================================================================
+MOST LIKELY CAUSE:
+====================================================================
+
+Based on your error, the most likely cause is:
+
+**BACKEND NOT DEPLOYED WITH CORS FIX**
+
+The CORS fix is in the GitHub code but NOT deployed to Render yet.
+
+====================================================================
+IMMEDIATE ACTION REQUIRED:
+====================================================================
+
+1. Go to: https://dashboard.render.com
+2. Login to your account
+3. Find service: "cropintel-hub-bnd"
+4. Click "Manual Deploy"
+5. Select "Deploy latest commit"
+6. Wait for "Deploy succeeded" (2-5 minutes)
+
+Then:
+7. Run: .\BUILD_MOBILE_APP_FINAL.bat
+8. Install new APK on device
+9. Test again
+
+====================================================================

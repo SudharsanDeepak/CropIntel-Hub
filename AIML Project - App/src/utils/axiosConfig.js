@@ -42,10 +42,19 @@ axiosInstance.interceptors.request.use(
 axiosInstance.interceptors.response.use(
   (response) => {
     console.log('[Axios] Response:', {
-      status: response.status,
-      url: response.config.url,
-      data: response.data,
+      status: response?.status,
+      url: response?.config?.url,
+      hasData: !!response?.data,
+      dataType: typeof response?.data,
     })
+    
+    // Ensure response has proper structure
+    if (!response) {
+      console.error('[Axios] Response is null or undefined')
+      throw new Error('Invalid response from server')
+    }
+    
+    // Return the response as-is - don't modify it
     return response
   },
   (error) => {
@@ -58,26 +67,26 @@ axiosInstance.interceptors.response.use(
     }
     
     console.error('[Axios] Response error:', {
-      message: error.message,
-      code: error.code,
-      status: error.response?.status,
-      data: error.response?.data,
-      url: error.config?.url,
+      message: error?.message,
+      code: error?.code,
+      status: error?.response?.status,
+      data: error?.response?.data,
+      url: error?.config?.url,
     })
     
     // Provide user-friendly error messages
-    if (error.code === 'ECONNABORTED') {
+    if (error?.code === 'ECONNABORTED') {
       error.userMessage = 'Request timeout. Please check your connection.'
-    } else if (error.code === 'ERR_NETWORK' || !error.response) {
+    } else if (error?.code === 'ERR_NETWORK' || !error?.response) {
       error.userMessage = 'Network error. Please check your internet connection.'
-    } else if (error.response?.status === 401) {
+    } else if (error?.response?.status === 401) {
       error.userMessage = 'Authentication failed. Please log in again.'
-    } else if (error.response?.status === 403) {
+    } else if (error?.response?.status === 403) {
       error.userMessage = 'Access denied.'
-    } else if (error.response?.status >= 500) {
+    } else if (error?.response?.status >= 500) {
       error.userMessage = 'Server error. Please try again later.'
     } else {
-      error.userMessage = error.response?.data?.message || 'An error occurred.'
+      error.userMessage = error?.response?.data?.message || 'An error occurred.'
     }
     
     return Promise.reject(error)

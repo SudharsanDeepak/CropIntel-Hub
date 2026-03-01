@@ -62,8 +62,80 @@ router.get(
       const redirectToApp = req.session?.redirectToApp || false
       
       if (redirectToApp) {
-        // Mobile app: Redirect to deep link
-        res.redirect(`cropintelhub://auth/callback?token=${token}`)
+        // Mobile app: Send HTML page that triggers deep link
+        // This is more reliable than direct redirect for in-app browsers
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Login Successful</title>
+            <style>
+              body {
+                font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                height: 100vh;
+                margin: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+              }
+              .container {
+                text-align: center;
+                padding: 2rem;
+              }
+              .spinner {
+                border: 4px solid rgba(255,255,255,0.3);
+                border-radius: 50%;
+                border-top: 4px solid white;
+                width: 40px;
+                height: 40px;
+                animation: spin 1s linear infinite;
+                margin: 0 auto 1rem;
+              }
+              @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="container">
+              <div class="spinner"></div>
+              <h2>Login Successful!</h2>
+              <p>Returning to app...</p>
+            </div>
+            <script>
+              // Try multiple methods to trigger the deep link
+              const deepLink = 'cropintelhub://auth/callback?token=${token}';
+              
+              console.log('Triggering deep link:', deepLink);
+              
+              // Method 1: Direct window.location
+              setTimeout(() => {
+                window.location.href = deepLink;
+              }, 500);
+              
+              // Method 2: Create invisible iframe (fallback)
+              setTimeout(() => {
+                const iframe = document.createElement('iframe');
+                iframe.style.display = 'none';
+                iframe.src = deepLink;
+                document.body.appendChild(iframe);
+              }, 1000);
+              
+              // Method 3: Create link and click it (another fallback)
+              setTimeout(() => {
+                const link = document.createElement('a');
+                link.href = deepLink;
+                link.click();
+              }, 1500);
+            </script>
+          </body>
+          </html>
+        `)
       } else {
         // Web: Redirect to website
         const frontendURL = process.env.FRONTEND_URL || 'http://localhost:5173'
@@ -73,7 +145,24 @@ router.get(
       console.error('Google Callback Error:', error);
       const redirectToApp = req.session?.redirectToApp || false
       if (redirectToApp) {
-        res.redirect('cropintelhub://auth/callback?error=auth_failed')
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <meta charset="UTF-8">
+            <title>Login Failed</title>
+          </head>
+          <body>
+            <h2>Login Failed</h2>
+            <p>Please close this window and try again.</p>
+            <script>
+              setTimeout(() => {
+                window.location.href = 'cropintelhub://auth/callback?error=auth_failed';
+              }, 2000);
+            </script>
+          </body>
+          </html>
+        `)
       } else {
         res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed`);
       }

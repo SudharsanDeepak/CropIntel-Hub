@@ -1,0 +1,114 @@
+====================================================================
+DEPLOY BACKEND TO RENDER - CRITICAL FIX FOR MOBILE APP
+====================================================================
+
+ISSUE:
+------
+The mobile app is getting "Network Error" because the backend CORS 
+configuration was blocking requests from the Capacitor mobile app.
+
+FIX APPLIED:
+------------
+Updated CORS configuration in index.js to allow:
+- Requests with no origin (mobile apps)
+- Requests from capacitor:// scheme
+- Requests from ionic:// scheme
+
+This fix has been pushed to GitHub (commit 6d24612).
+
+====================================================================
+DEPLOYMENT STEPS:
+====================================================================
+
+OPTION 1: AUTO-DEPLOY (If enabled on Render)
+---------------------------------------------
+1. Go to https://dashboard.render.com
+2. Log in to your account
+3. Find your backend service (cropintel-hub-bnd)
+4. Check if it's auto-deploying from GitHub
+5. Wait for deployment to complete (usually 2-5 minutes)
+6. Check the logs for "Deploy succeeded"
+
+OPTION 2: MANUAL DEPLOY
+------------------------
+1. Go to https://dashboard.render.com
+2. Log in to your account
+3. Find your backend service (cropintel-hub-bnd)
+4. Click "Manual Deploy" button
+5. Select "Deploy latest commit"
+6. Wait for deployment to complete
+7. Check the logs for "Deploy succeeded"
+
+====================================================================
+VERIFY DEPLOYMENT:
+====================================================================
+
+1. Open browser and go to:
+   https://cropintel-hub-bnd.onrender.com/health
+
+2. You should see a JSON response with:
+   {
+     "status": "ok",
+     "timestamp": "...",
+     ...
+   }
+
+3. If you see this, the backend is deployed and running!
+
+====================================================================
+TEST MOBILE APP AFTER DEPLOYMENT:
+====================================================================
+
+1. Open the mobile app on your device
+2. Click "Login" button
+3. Click "Continue with Google"
+4. Select your Gmail account
+5. Browser should close
+6. App should reload
+7. You should be logged in!
+
+The network errors should be gone now.
+
+====================================================================
+TROUBLESHOOTING:
+====================================================================
+
+IF RENDER SHOWS "BUILD FAILED":
+- Check the build logs for errors
+- Make sure all dependencies are in package.json
+- Check if MongoDB connection string is set in environment variables
+
+IF RENDER SHOWS "DEPLOY SUCCEEDED" BUT APP STILL HAS ERRORS:
+- Wait 1-2 minutes for the service to fully start
+- Check if the service is "Live" (green status)
+- Try the /health endpoint again
+- Check Render logs for runtime errors
+
+IF MOBILE APP STILL SHOWS NETWORK ERRORS:
+- Make sure you're testing with the NEW APK (rebuild after backend deploy)
+- Check if VITE_API_URL in .env.production is correct
+- Try clearing app data and reinstalling
+
+====================================================================
+IMPORTANT NOTES:
+====================================================================
+
+1. Render free tier services sleep after 15 minutes of inactivity
+2. First request after sleep takes 30-60 seconds to wake up
+3. This is normal behavior for free tier
+4. Consider upgrading to paid tier for production use
+
+5. After backend is deployed, you MUST rebuild the mobile app:
+   - Run: .\BUILD_MOBILE_APP_FINAL.bat
+   - Install the new APK on your device
+   - Test OAuth login again
+
+====================================================================
+RENDER DASHBOARD:
+====================================================================
+
+URL: https://dashboard.render.com
+Service Name: cropintel-hub-bnd
+Service URL: https://cropintel-hub-bnd.onrender.com
+
+====================================================================

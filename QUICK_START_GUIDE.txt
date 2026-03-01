@@ -1,0 +1,92 @@
+====================================================================
+QUICK START GUIDE - FIX MOBILE APP NETWORK ERRORS
+====================================================================
+
+WHAT'S THE PROBLEM?
+-------------------
+Mobile app shows "Network Error" after OAuth login because:
+1. Backend CORS blocks mobile app requests
+2. Axios not configured for mobile apps
+
+WHAT'S THE FIX?
+---------------
+1. Updated backend CORS to allow mobile apps
+2. Created mobile-friendly axios configuration
+3. Added better error handling and logging
+
+====================================================================
+3-STEP FIX (DO IN ORDER):
+====================================================================
+
+STEP 1: DEPLOY BACKEND TO RENDER ⚠️ CRITICAL
+---------------------------------------------
+1. Go to: https://dashboard.render.com
+2. Login to your account
+3. Find service: "cropintel-hub-bnd"
+4. Click "Manual Deploy" button
+5. Select "Deploy latest commit"
+6. Wait for "Deploy succeeded" (2-5 minutes)
+7. Verify: https://cropintel-hub-bnd.onrender.com/health
+   (Should show JSON with "status": "ok")
+
+STEP 2: BUILD NEW APK
+---------------------
+1. Open terminal in project root
+2. Run: .\BUILD_MOBILE_APP_FINAL.bat
+3. Wait for build to complete
+4. APK will be at:
+   AIML Project - App\android\app\build\outputs\apk\debug\app-debug.apk
+
+STEP 3: INSTALL AND TEST
+------------------------
+1. Uninstall old app from device
+2. Transfer and install new APK
+3. Open app
+4. Click "Login" → "Continue with Google"
+5. Select Gmail account
+6. Browser closes, app reloads
+7. You should be logged in! ✓
+
+====================================================================
+VERIFICATION:
+====================================================================
+
+Backend is deployed correctly if:
+✓ https://cropintel-hub-bnd.onrender.com/health shows "status": "ok"
+
+App is working correctly if:
+✓ No "Network Error" messages
+✓ OAuth login completes
+✓ Your name appears in navbar
+✓ Dashboard loads with data
+
+====================================================================
+TROUBLESHOOTING:
+====================================================================
+
+Still seeing errors?
+
+1. Check backend deployment:
+   - Run: .\CHECK_BACKEND_STATUS.bat
+   - Should show "status": "ok"
+
+2. Check console logs:
+   - Connect device to chrome://inspect
+   - Look for [Axios] logs
+   - Share logs if errors persist
+
+3. Wake up backend (if sleeping):
+   - Visit: https://cropintel-hub-bnd.onrender.com/health
+   - Wait 60 seconds
+   - Try app again
+
+====================================================================
+NEED MORE HELP?
+====================================================================
+
+Read detailed guides:
+- COMPLETE_FIX_GUIDE.txt (full troubleshooting)
+- DEPLOY_BACKEND_TO_RENDER.txt (deployment help)
+- FINAL_MOBILE_APP_FIX_SUMMARY.txt (all fixes explained)
+
+====================================================================

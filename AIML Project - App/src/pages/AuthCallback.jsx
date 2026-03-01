@@ -2,9 +2,7 @@ import { useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import toast from 'react-hot-toast'
-import axios from 'axios'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+import axiosInstance from '../utils/axiosConfig'
 
 const AuthCallback = () => {
   const navigate = useNavigate()
@@ -22,7 +20,7 @@ const AuthCallback = () => {
       if (token) {
         try {
           localStorage.setItem('token', token)
-          const response = await axios.get(`${API_URL}/api/auth/me`, {
+          const response = await axiosInstance.get('/api/auth/me', {
             headers: {
               Authorization: `Bearer ${token}`,
             },
@@ -40,7 +38,7 @@ const AuthCallback = () => {
           console.error('Auth callback error:', error)
           localStorage.removeItem('token')
           localStorage.removeItem('user')
-          toast.error('Authentication failed')
+          toast.error(error.userMessage || 'Authentication failed')
           navigate('/')
         }
       } else {

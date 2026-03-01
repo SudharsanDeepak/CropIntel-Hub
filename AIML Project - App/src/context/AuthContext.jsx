@@ -1,12 +1,11 @@
 import { createContext, useContext, useState, useEffect } from 'react'
-import axios from 'axios'
+import axiosInstance, { API_URL } from '../utils/axiosConfig'
 import toast from 'react-hot-toast'
 import { App as CapacitorApp } from '@capacitor/app'
 import { Browser } from '@capacitor/browser'
 import { Capacitor } from '@capacitor/core'
 
 const AuthContext = createContext(null)
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 export const useAuth = () => {
   const context = useContext(AuthContext)
@@ -96,11 +95,14 @@ export const AuthProvider = ({ children }) => {
     try {
       setLoading(true)
       console.log('[AuthContext] Fetching current user with token:', token ? 'present' : 'missing')
-      const response = await axios.get(`${API_URL}/api/auth/me`, {
+      console.log('[AuthContext] API URL:', API_URL)
+      
+      const response = await axiosInstance.get('/api/auth/me', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       })
+      
       console.log('[AuthContext] User fetch response:', response.data)
       if (response.data.success) {
         setUser(response.data.user)
@@ -114,9 +116,23 @@ export const AuthProvider = ({ children }) => {
       }
     } catch (error) {
       console.error('[AuthContext] Failed to fetch user:', error)
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      setUser(null)
+      console.error('[AuthContext] Error details:', {
+        message: error.message,
+        code: error.code,
+        response: error.response?.data,
+        status: error.response?.status
+      })
+      
+      // Don't clear token on network errors - might be temporary
+      if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || !error.response) {
+        console.log('[AuthContext] Network error - keeping token for retry')
+        toast.error('Network error. Please check your connection.')
+      } else {
+        // Clear token only on auth errors
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        setUser(null)
+      }
     } finally {
       setLoading(false)
       console.log('[AuthContext] Loading state set to false')
@@ -124,7 +140,7 @@ export const AuthProvider = ({ children }) => {
   }
   const sendOTPSignup = async (email) => {
     try {
-      const response = await axios.post(`${API_URL}/api/auth/send-otp-signup`, {
+      const response = await axiosInstance.post('/api/auth/send-otp-signup', {
         email,
       })
       if (response.data.success) {
@@ -136,14 +152,14 @@ export const AuthProvider = ({ children }) => {
         return { success: true, devMode: response.data.devMode, otp: response.data.otp }
       }
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to send OTP'
+      const message = error.userMessage || error.response?.data?.message || 'Failed to send OTP'
       toast.error(message)
       return { success: false, error: message }
     }
   }
   const verifyOTPSignup = async (name, email, password, otp) => {
     try {
-      const response = await axios.post(`${API_URL}/api/auth/verify-otp-signup`, {
+      const response = await axiosInstance.post('/api/auth/verify-otp-signup', {
         name,
         email,
         password,
@@ -159,14 +175,14 @@ export const AuthProvider = ({ children }) => {
         return { success: true }
       }
     } catch (error) {
-      const message = error.response?.data?.message || 'Verification failed'
+      const message = error.userMessage || error.response?.data?.message || 'Verification failed'
       toast.error(message)
       return { success: false, error: message }
     }
   }
   const sendOTPLogin = async (email, password) => {
     try {
-      const response = await axios.post(`${API_URL}/api/auth/send-otp-login`, {
+      const response = await axiosInstance.post('/api/auth/send-otp-login', {
         email,
         password,
       })
@@ -179,14 +195,14 @@ export const AuthProvider = ({ children }) => {
         return { success: true, devMode: response.data.devMode, otp: response.data.otp }
       }
     } catch (error) {
-      const message = error.response?.data?.message || 'Failed to send OTP'
+      const message = error.userMessage || error.response?.data?.message || 'Failed to send OTP'
       toast.error(message)
       return { success: false, error: message }
     }
   }
   const verifyOTPLogin = async (email, otp) => {
     try {
-      const response = await axios.post(`${API_URL}/api/auth/verify-otp-login`, {
+      const response = await axiosInstance.post('/api/auth/verify-otp-login', {
         email,
         otp,
       })
@@ -200,7 +216,7 @@ export const AuthProvider = ({ children }) => {
         return { success: true }
       }
     } catch (error) {
-      const message = error.response?.data?.message || 'Verification failed'
+      const message = error.userMessage || error.response?.data?.message || 'Verification failed'
       toast.error(message)
       return { success: false, error: message }
     }

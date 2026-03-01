@@ -19,6 +19,13 @@ router.get('/google', (req, res, next) => {
       hint: 'See GOOGLE_OAUTH_SETUP.md for instructions',
     });
   }
+  
+  // Store redirect type in session for callback
+  if (req.query.redirect === 'app') {
+    req.session = req.session || {}
+    req.session.redirectToApp = true
+  }
+  
   passport.authenticate('google', {
     scope: ['profile', 'email'],
   })(req, res, next);
@@ -27,6 +34,10 @@ router.get(
   '/google/callback',
   (req, res, next) => {
     if (!isGoogleOAuthConfigured()) {
+      const redirectToApp = req.session?.redirectToApp || false
+      if (redirectToApp) {
+        return res.redirect('cropintelhub://auth/callback?error=oauth_not_configured')
+      }
       return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=oauth_not_configured`);
     }
     next();
@@ -37,16 +48,35 @@ router.get(
   }),
   (req, res) => {
     try {
+      if (!req.user) {
+        throw new Error('User not found after OAuth')
+      }
+
       const token = jwt.sign(
         { id: req.user._id, email: req.user.email },
         JWT_SECRET,
         { expiresIn: '7d' }
       );
-      const frontendURL = process.env.FRONTEND_URL || 'http://localhost:5173'
-      res.redirect(`${frontendURL}/auth/callback?token=${token}`);
+      
+      // Check if this is a mobile app request
+      const redirectToApp = req.session?.redirectToApp || false
+      
+      if (redirectToApp) {
+        // Mobile app: Redirect to deep link
+        res.redirect(`cropintelhub://auth/callback?token=${token}`)
+      } else {
+        // Web: Redirect to website
+        const frontendURL = process.env.FRONTEND_URL || 'http://localhost:5173'
+        res.redirect(`${frontendURL}/auth/callback?token=${token}`)
+      }
     } catch (error) {
       console.error('Google Callback Error:', error);
-      res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed`);
+      const redirectToApp = req.session?.redirectToApp || false
+      if (redirectToApp) {
+        res.redirect('cropintelhub://auth/callback?error=auth_failed')
+      } else {
+        res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=auth_failed`);
+      }
     }
   }
 );

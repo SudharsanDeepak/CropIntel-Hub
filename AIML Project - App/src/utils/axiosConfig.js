@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { Capacitor } from '@capacitor/core'
+import { CapacitorHttp } from '@capacitor/core'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
@@ -12,11 +13,49 @@ const axiosInstance = axios.create({
   },
 })
 
-// Add request interceptor for logging and mobile-specific headers
+// For Capacitor apps, use native HTTP instead of axios
+const isNative = Capacitor.isNativePlatform()
+
+// Wrapper function to use CapacitorHttp for native apps
+const makeRequest = async (config) => {
+  if (isNative) {
+    try {
+      console.log('[CapacitorHttp] Making native request:', config)
+      
+      const url = config.url?.startsWith('http') ? config.url : `${API_URL}${config.url}`
+      
+      const options = {
+        url,
+        method: config.method?.toUpperCase() || 'GET',
+        headers: config.headers || {},
+        data: config.data,
+      }
+      
+      const response = await CapacitorHttp.request(options)
+      
+      console.log('[CapacitorHttp] Native response:', response)
+      
+      // Transform to axios-like response
+      return {
+        data: response.data,
+        status: response.status,
+        statusText: response.status === 200 ? 'OK' : 'Error',
+        headers: response.headers,
+        config,
+      }
+    } catch (error) {
+      console.error('[CapacitorHttp] Native request error:', error)
+      throw error
+    }
+  } else {
+    // Web: use regular axios
+    return axiosInstance(config)
+  }
+}
+
+// Add request interceptor for logging
 axiosInstance.interceptors.request.use(
   (config) => {
-    const isNative = Capacitor.isNativePlatform()
-    
     console.log('[Axios] Request:', {
       method: config.method,
       url: config.url,
@@ -76,5 +115,13 @@ axiosInstance.interceptors.response.use(
   }
 )
 
-export default axiosInstance
+// Export the wrapper function for native apps
+export const httpClient = {
+  get: (url, config = {}) => makeRequest({ ...config, method: 'GET', url }),
+  post: (url, data, config = {}) => makeRequest({ ...config, method: 'POST', url, data }),
+  put: (url, data, config = {}) => makeRequest({ ...config, method: 'PUT', url, data }),
+  delete: (url, config = {}) => makeRequest({ ...config, method: 'DELETE', url }),
+}
+
+export default isNative ? httpClient : axiosInstance
 export { API_URL }

@@ -1,5 +1,29 @@
 {
   "appId": "com.cropintelhub.app",
   "appName": "CropIntel HUB",
-  "webDir": "dist"
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true,
+    "allowNavigation": [
+      "cropintel-hub-bnd.onrender.com",
+      "cropintel-hub-ml.onrender.com",
+      "api.openweathermap.org",
+      "api.groq.com",
+      "accounts.google.com"
+    ]
+  },
+  "android": {
+    "allowMixedContent": true
+  },
+  "plugins": {
+    "App": {
+      "appUrlScheme": "cropintelhub"
+    },
+    "StatusBar": {
+      "style": "Light",
+      "backgroundColor": "#FFFFFF",
+      "overlaysWebView": false
+    }
+  }
 }

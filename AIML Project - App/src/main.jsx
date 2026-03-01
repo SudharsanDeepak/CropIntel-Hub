@@ -6,6 +6,8 @@ import { Toaster } from 'react-hot-toast'
 import { AuthProvider } from './context/AuthContext'
 import App from './App'
 import './index.css'
+import { StatusBar } from '@capacitor/status-bar'
+import { Capacitor } from '@capacitor/core'
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -15,6 +17,18 @@ const queryClient = new QueryClient({
     },
   },
 })
+
+// Initialize StatusBar plugin before React renders (mobile only)
+if (Capacitor.isNativePlatform()) {
+  try {
+    StatusBar.setOverlaysWebView({ overlay: false })
+    StatusBar.setStyle({ style: 'Light' })
+    StatusBar.setBackgroundColor({ color: '#FFFFFF' })
+  } catch (error) {
+    console.log('StatusBar plugin not available:', error)
+  }
+}
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <QueryClientProvider client={queryClient}>

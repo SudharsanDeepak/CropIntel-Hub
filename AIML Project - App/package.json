@@ -5,6 +5,12 @@
   "private": true,
   "description": "Professional Market Intelligence Platform for Fruits & Vegetables Price Tracking",
   "dependencies": {
+    "@capacitor/android": "^8.1.0",
+    "@capacitor/app": "^8.0.1",
+    "@capacitor/browser": "^8.0.1",
+    "@capacitor/cli": "^8.1.0",
+    "@capacitor/core": "^8.1.0",
+    "@capacitor/status-bar": "^8.0.1",
     "axios": "^1.6.2",
     "date-fns": "^3.0.6",
     "framer-motion": "^10.16.16",

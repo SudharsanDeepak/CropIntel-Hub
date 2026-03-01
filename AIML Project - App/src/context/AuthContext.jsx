@@ -1,6 +1,9 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import axios from 'axios'
 import toast from 'react-hot-toast'
+import { App as CapacitorApp } from '@capacitor/app'
+import { Browser } from '@capacitor/browser'
+import { Capacitor } from '@capacitor/core'
 
 const AuthContext = createContext(null)
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
@@ -17,6 +20,9 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true)
   const [isLoginOpen, setIsLoginOpen] = useState(false)
   const [isSignupOpen, setIsSignupOpen] = useState(false)
+  
+  const isNativePlatform = Capacitor.isNativePlatform()
+  
   useEffect(() => {
     const token = localStorage.getItem('token')
     if (token) {
@@ -24,7 +30,60 @@ export const AuthProvider = ({ children }) => {
     } else {
       setLoading(false)
     }
-  }, [])
+    
+    // Setup deep link listener for mobile app
+    if (!isNativePlatform) return
+
+    let listener = null
+
+    const setupDeepLinks = async () => {
+      listener = await CapacitorApp.addListener('appUrlOpen', async (event) => {
+        console.log('Deep link received:', event.url)
+        
+        // Close the in-app browser immediately
+        try {
+          await Browser.close()
+        } catch (error) {
+          console.log('Browser already closed or not open')
+        }
+        
+        // Handle OAuth callback: cropintelhub://auth/callback?token=xxx
+        if (event.url.includes('auth/callback')) {
+          try {
+            const url = new URL(event.url)
+            const token = url.searchParams.get('token')
+            const error = url.searchParams.get('error')
+            
+            if (token) {
+              console.log('Token received from OAuth:', token)
+              localStorage.setItem('token', token)
+              await fetchCurrentUser(token)
+              toast.success('Welcome back!')
+              setIsLoginOpen(false)
+            } else if (error) {
+              console.error('OAuth error:', error)
+              toast.error('Authentication failed. Please try again.')
+            } else {
+              console.error('Deep link missing token and error parameters')
+              toast.error('Invalid authentication link')
+            }
+          } catch (error) {
+            console.error('Failed to parse deep link:', error)
+            toast.error('Invalid authentication link')
+          }
+        }
+      })
+    }
+    
+    setupDeepLinks()
+
+    // Cleanup listener on unmount
+    return () => {
+      if (listener) {
+        listener.remove()
+      }
+    }
+  }, [isNativePlatform])
   const fetchCurrentUser = async (token) => {
     try {
       const response = await axios.get(`${API_URL}/api/auth/me`, {
@@ -126,8 +185,18 @@ export const AuthProvider = ({ children }) => {
       return { success: false, error: message }
     }
   }
-  const loginWithGoogle = () => {
-    window.location.href = `${API_URL}/api/auth/google`
+  const loginWithGoogle = async () => {
+    if (isNativePlatform) {
+      // Mobile app: Open OAuth in in-app browser with redirect to deep link
+      const authUrl = `${API_URL}/api/auth/google?redirect=app`
+      await Browser.open({ 
+        url: authUrl,
+        presentationStyle: 'popover'
+      })
+    } else {
+      // Web: Use regular redirect
+      window.location.href = `${API_URL}/api/auth/google`
+    }
   }
   const logout = () => {
     // Clear all auth data from localStorage first

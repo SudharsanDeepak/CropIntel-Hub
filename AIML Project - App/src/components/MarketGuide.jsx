@@ -1,7 +1,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { MessageCircle, X, Send, Bot, User, TrendingUp, DollarSign, Package, Calendar } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
-import axios from 'axios'
+import axiosInstance from '../utils/axiosConfig'
 import { matchProducts } from '../utils/productMatcher'
 import { parseQuery } from '../utils/queryParser'
 import { ConversationManager } from '../utils/conversationManager'
@@ -47,9 +47,7 @@ const MarketGuide = () => {
   }, [isOpen, conversationManager])
   const fetchProducts = async (retryCount = 0) => {
     try {
-      const response = await axios.get(`${API_URL}/api/products/latest`, {
-        timeout: 30000 // Increased to 30 seconds
-      })
+      const response = await axiosInstance.get('/api/products/latest')
       setProducts(response.data || [])
     } catch (error) {
       console.error('Error fetching products:', error)

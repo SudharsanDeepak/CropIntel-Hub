@@ -86,6 +86,7 @@ export const AuthProvider = ({ children }) => {
   }, [isNativePlatform])
   const fetchCurrentUser = async (token) => {
     try {
+      setLoading(true)
       const response = await axios.get(`${API_URL}/api/auth/me`, {
         headers: {
           Authorization: `Bearer ${token}`,
@@ -93,11 +94,17 @@ export const AuthProvider = ({ children }) => {
       })
       if (response.data.success) {
         setUser(response.data.user)
+        localStorage.setItem('user', JSON.stringify(response.data.user))
+      } else {
+        // Invalid token
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
       }
     } catch (error) {
       console.error('Failed to fetch user:', error)
       localStorage.removeItem('token')
       localStorage.removeItem('user')
+      setUser(null)
     } finally {
       setLoading(false)
     }

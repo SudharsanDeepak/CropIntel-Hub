@@ -21,7 +21,19 @@ app.use(cors({
       process.env.FRONTEND_URL
     ].filter(Boolean);
     
-    if (!origin || allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || origin.endsWith('.netlify.app')) {
+    // Allow mobile app (Capacitor) - no origin or capacitor:// scheme
+    if (!origin) {
+      callback(null, true);
+      return;
+    }
+    
+    // Allow Capacitor apps (they use capacitor:// or https:// scheme)
+    if (origin.startsWith('capacitor://') || origin.startsWith('ionic://')) {
+      callback(null, true);
+      return;
+    }
+    
+    if (allowedOrigins.includes(origin) || origin.endsWith('.vercel.app') || origin.endsWith('.netlify.app')) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

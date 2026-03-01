@@ -275,25 +275,53 @@ export const AuthProvider = ({ children }) => {
       console.log('[OAuth] Opening browser with URL:', authUrl)
       
       try {
-        // Listen for browser close event
-        const listener = await Browser.addListener('browserFinished', async () => {
-          console.log('[OAuth] Browser closed, checking for token')
+        let tokenFound = false
+        
+        // Listen for URL changes in the browser to intercept the callback
+        const urlListener = await Browser.addListener('browserPageLoaded', async (info) => {
+          console.log('[OAuth] Browser page loaded:', info.url)
           
-          // Small delay to ensure any pending operations complete
-          await new Promise(resolve => setTimeout(resolve, 500))
-          
-          // Check if we got a token
-          const token = localStorage.getItem('token')
-          if (token) {
-            console.log('[OAuth] Token found after browser close, fetching user')
-            await fetchCurrentUser(token)
-            window.location.href = '/'
-          } else {
-            console.log('[OAuth] No token found after browser close')
+          // Check if this is our special callback URL
+          if (info.url && info.url.includes('/__oauth_callback__')) {
+            console.log('[OAuth] Callback URL detected, extracting token')
+            
+            try {
+              const url = new URL(info.url)
+              const token = url.searchParams.get('token')
+              
+              if (token && !tokenFound) {
+                tokenFound = true
+                console.log('[OAuth] Token extracted from URL')
+                
+                // Store token
+                localStorage.setItem('token', token)
+                
+                // Close browser
+                await Browser.close()
+                
+                // Fetch user
+                await fetchCurrentUser(token)
+                
+                // Reload app
+                window.location.href = '/'
+              }
+            } catch (error) {
+              console.error('[OAuth] Failed to parse callback URL:', error)
+            }
           }
+        })
+        
+        // Listen for browser close event as fallback
+        const closeListener = await Browser.addListener('browserFinished', async () => {
+          console.log('[OAuth] Browser closed')
           
-          // Remove listener
-          listener.remove()
+          // Clean up listeners
+          urlListener.remove()
+          closeListener.remove()
+          
+          if (!tokenFound) {
+            console.log('[OAuth] No token found')
+          }
         })
         
         await Browser.open({ 

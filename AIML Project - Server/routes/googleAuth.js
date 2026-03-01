@@ -62,7 +62,7 @@ router.get(
       const redirectToApp = req.session?.redirectToApp || false
       
       if (redirectToApp) {
-        // Mobile app: Send HTML page that stores token in localStorage and closes
+        // Mobile app: Redirect to special URL that app can intercept
         res.send(`
           <!DOCTYPE html>
           <html>
@@ -85,19 +85,6 @@ router.get(
                 text-align: center;
                 padding: 2rem;
               }
-              .spinner {
-                border: 4px solid rgba(255,255,255,0.3);
-                border-radius: 50%;
-                border-top: 4px solid white;
-                width: 40px;
-                height: 40px;
-                animation: spin 1s linear infinite;
-                margin: 0 auto 1rem;
-              }
-              @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-              }
               .success {
                 font-size: 48px;
                 margin-bottom: 1rem;
@@ -108,16 +95,17 @@ router.get(
             <div class="container">
               <div class="success">✓</div>
               <h2>Login Successful!</h2>
-              <p>You can close this window now.</p>
-              <p style="font-size: 0.9em; opacity: 0.8; margin-top: 1rem;">Returning to app...</p>
+              <p>Redirecting back to app...</p>
             </div>
             <script>
-              console.log('[OAuth Callback] Storing token in localStorage');
+              console.log('[OAuth Callback] Redirecting with token');
               
-              // Store token in localStorage
-              const token = '${token}';
-              localStorage.setItem('token', token);
-              console.log('[OAuth Callback] Token stored successfully');
+              // Redirect to special URL that app can intercept
+              window.location.href = 'https://localhost/__oauth_callback__?token=${token}';
+            </script>
+          </body>
+          </html>
+        `)
               
               // Close the browser after a short delay
               setTimeout(() => {

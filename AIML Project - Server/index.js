@@ -132,6 +132,24 @@ app.get("/api/monitoring/stats", async (req, res) => {
   }
 });
 
+// Test email endpoint (for debugging)
+app.get("/api/test-email", async (req, res) => {
+  try {
+    const { sendPriceAlertEmail } = require('./services/priceAlertService');
+    const result = await sendPriceAlertEmail(
+      'sudharsansubramaniam3@gmail.com',
+      'Test Product',
+      100,
+      120,
+      'below'
+    );
+    res.json({ success: result.success, message: 'Email test completed', result });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+
 // Health check endpoint
 app.get("/health", async (req, res) => {
   try {
@@ -340,6 +358,20 @@ const startServer = async () => {
   try {
     await connectDB();
     
+    // Handle 404 - must be after all other routes but before error handler
+    app.use((req, res, next) => {
+      // If it's an API route that doesn't exist, return 404
+      if (req.path.startsWith('/api/')) {
+        return res.status(404).json({
+          success: false,
+          message: 'API endpoint not found',
+          path: req.path
+        });
+      }
+      // For non-API routes, pass to error handler
+      next();
+    });
+    
     // Global error handler - must be after all routes
     app.use((err, req, res, next) => {
       console.error('❌ Unhandled Error:', err);
@@ -360,6 +392,11 @@ const startServer = async () => {
       
       const { startPriceMonitoring } = require('./services/priceMonitor');
       startPriceMonitoring();
+      
+      // Heartbeat to prove server is alive
+      setInterval(() => {
+        console.log(`💓 Server heartbeat - Uptime: ${Math.floor(process.uptime())} seconds`);
+      }, 60000); // Log every minute
     });
   } catch (error) {
     console.error("Server startup failed:", error.message);

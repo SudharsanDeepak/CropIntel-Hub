@@ -77,7 +77,16 @@ export const useMarketData = () => {
           queryClient.invalidateQueries()
         },
         onError: (error) => {
-          toast.error(`Failed to update data: ${error.message}`)
+          console.error('Update market data error:', error)
+          const errorMessage = error.response?.data?.error || error.message || 'Unknown error'
+          
+          if (error.code === 'ECONNABORTED' || errorMessage.includes('timeout')) {
+            toast.error('Update is taking longer than expected. The data will be updated in the background.')
+          } else if (errorMessage.includes('Failed to update market data')) {
+            toast.error('Unable to update market data. The ML service may be temporarily unavailable.')
+          } else {
+            toast.error(`Failed to update data: ${errorMessage}`)
+          }
         },
       }
     )

@@ -170,14 +170,28 @@ const startPriceMonitoring = () => {
   // Use setInterval for reliable execution every minute (60000ms)
   // This is more reliable than node-cron on some cloud platforms
   const intervalId = setInterval(() => {
-    console.log(`\n⏰ [${new Date().toLocaleTimeString()}] Interval triggered - running scheduled check...`);
+    const now = new Date();
+    console.log(`\n⏰ [${now.toLocaleTimeString()}] Interval triggered - running scheduled check...`);
+    console.log(`   Interval still active: ${intervalId ? 'Yes' : 'No'}`);
+    console.log(`   Process uptime: ${Math.floor(process.uptime())} seconds`);
+    
     checkPriceAlerts().catch(err => {
       console.error('❌ Scheduled check failed:', err.message);
+      console.error('   But interval will continue...');
     });
   }, 60000); // 60000ms = 1 minute
   
+  // Prevent interval from being garbage collected
+  if (intervalId.unref) {
+    intervalId.unref();
+  }
+  
   console.log('✅ Monitoring system active - checking every minute');
-  console.log(`✅ Interval ID: ${intervalId}\n`);
+  console.log(`✅ Interval ID: ${intervalId}`);
+  console.log(`✅ Next check in 60 seconds\n`);
+  
+  // Keep the interval reference
+  global.priceMonitoringInterval = intervalId;
   
   return intervalId;
 };

@@ -37,7 +37,7 @@ export const marketAPI = {
   getDataSources: () => 
     api.get('/api/data/sources'),
   updateMarketData: () => 
-    api.post('/api/data/update', {}),
+    api.post('/api/data/update', {}, { timeout: 180000 }), // 3 minutes timeout
 }
 
 export default api

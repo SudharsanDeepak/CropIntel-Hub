@@ -23,6 +23,11 @@ const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, co
   try {
     const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
     
+    console.log(`📧 Attempting to send email to: ${email}`);
+    console.log(`   EMAIL_USER configured: ${process.env.EMAIL_USER ? 'Yes' : 'No'}`);
+    console.log(`   EMAIL_PASSWORD configured: ${process.env.EMAIL_PASSWORD ? 'Yes (length: ' + process.env.EMAIL_PASSWORD.length + ')' : 'No'}`);
+    console.log(`   EMAIL_SERVICE: ${process.env.EMAIL_SERVICE || 'Not set'}`);
+    
     if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD || 
         process.env.EMAIL_USER === 'your-gmail@gmail.com' ||
         process.env.EMAIL_PASSWORD === 'your-app-password-here') {
@@ -35,6 +40,8 @@ const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, co
         devMode: true
       };
     }
+    
+    console.log(`📤 Creating email transporter...`);
     const transporter = createTransporter();
     const priceDirection = condition === 'below' ? 'dropped below' : 'risen above';
     const emoji = condition === 'below' ? '📉' : '📈';
@@ -298,11 +305,25 @@ const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, co
       subject: subject,
       html: html,
     };
+    
+    console.log(`📨 Sending email...`);
+    console.log(`   From: ${process.env.EMAIL_USER}`);
+    console.log(`   To: ${email}`);
+    console.log(`   Subject: ${subject}`);
+    
     const info = await transporter.sendMail(mailOptions);
-    console.log('✅ Price alert email sent:', info.messageId);
+    
+    console.log('✅ Price alert email sent successfully!');
+    console.log(`   Message ID: ${info.messageId}`);
+    console.log(`   Response: ${info.response || 'No response'}`);
+    
     return { success: true, messageId: info.messageId };
   } catch (error) {
-    console.error('❌ Price alert email failed:', error);
+    console.error('❌ Price alert email failed!');
+    console.error(`   Error type: ${error.name}`);
+    console.error(`   Error message: ${error.message}`);
+    console.error(`   Error code: ${error.code || 'N/A'}`);
+    console.error(`   Full error:`, error);
     return { success: false, error: error.message };
   }
 };

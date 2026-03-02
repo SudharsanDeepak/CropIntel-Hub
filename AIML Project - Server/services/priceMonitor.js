@@ -1,4 +1,3 @@
-const cron = require('node-cron');
 const axios = require('axios');
 const Alert = require('../models/Alert');
 const { sendPriceAlertEmail } = require('./priceAlertService');
@@ -162,13 +161,17 @@ const startPriceMonitoring = () => {
   
   // Run initial check immediately
   console.log('🔄 Running initial check...');
-  checkPriceAlerts();
-  
-  // Schedule checks every minute
-  // Cron format: * * * * * (every minute)
-  cron.schedule('* * * * *', () => {
-    checkPriceAlerts();
+  checkPriceAlerts().catch(err => {
+    console.error('❌ Initial check failed:', err.message);
   });
+  
+  // Use setInterval for reliable execution every minute (60000ms)
+  // This is more reliable than node-cron on some cloud platforms
+  setInterval(() => {
+    checkPriceAlerts().catch(err => {
+      console.error('❌ Scheduled check failed:', err.message);
+    });
+  }, 60000); // 60000ms = 1 minute
   
   console.log('✅ Monitoring system active - checking every minute\n');
 };

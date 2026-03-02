@@ -27,12 +27,14 @@ const checkPriceAlerts = async () => {
     
     console.log(`   📋 Found ${alerts.length} active alert(s) to check`);
     
-    // Fetch latest product prices from ML API
+    // Fetch latest product prices from ML API with timeout
+    console.log(`   🌐 Fetching product prices from ML API...`);
     const response = await axios.get(`${ML_API}/products/latest`, {
-      timeout: 30000 // 30 second timeout
+      timeout: 15000 // 15 second timeout
     });
     
     const products = response.data || [];
+    console.log(`   💰 Loaded ${products.length} product prices`);
     
     if (products.length === 0) {
       console.log('   ⚠️  No product data available from ML API');
@@ -40,8 +42,6 @@ const checkPriceAlerts = async () => {
       totalChecks++;
       return { checked: 0, triggered: 0 };
     }
-    
-    console.log(`   💰 Loaded ${products.length} product prices`);
     
     // Create price map for quick lookup
     const priceMap = {};
@@ -139,11 +139,27 @@ const checkPriceAlerts = async () => {
     return { checked: checkedCount, triggered: triggeredCount };
     
   } catch (error) {
-    console.error('❌ Error checking price alerts:', error.message);
+    const checkDuration = Date.now() - checkStartTime.getTime();
+    console.error(`\n   ❌ Error checking price alerts after ${checkDuration}ms`);
+    console.error(`   Error type: ${error.code || error.name}`);
+    console.error(`   Error message: ${error.message}`);
+    
+    if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+      console.error('   ⏱️  ML API timeout - will retry next minute');
+    } else if (error.code === 'ECONNREFUSED') {
+      console.error('   🔌 ML API connection refused - service may be down');
+    } else {
+      console.error('   🐛 Unexpected error:', error);
+    }
+    
     lastError = {
       message: error.message,
+      code: error.code,
       time: new Date()
     };
+    
+    lastCheckTime = checkStartTime;
+    totalChecks++;
     
     // Don't throw - let the cron continue
     return { checked: 0, triggered: 0, error: error.message };

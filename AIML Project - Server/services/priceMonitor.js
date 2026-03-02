@@ -91,12 +91,12 @@ const checkPriceAlerts = async () => {
           alert.condition
         );
         
+        // ALWAYS mark alert as triggered to prevent infinite retries
+        alert.triggered = true;
+        alert.lastTriggeredAt = new Date();
+        
         if (emailResult.success) {
           console.log(`   ✅ Email notification sent to ${alert.email}`);
-          
-          // Update alert status
-          alert.triggered = true;
-          alert.lastTriggeredAt = new Date();
           
           // If notify once, disable the alert
           if (alert.notifyOnce) {
@@ -109,18 +109,19 @@ const checkPriceAlerts = async () => {
           totalTriggered++;
         } else {
           console.log(`   ❌ Email failed: ${emailResult.error}`);
+          console.log(`   ⚠️  Alert marked as triggered to prevent retries`);
+          
           if (emailResult.devMode) {
             console.log(`   ℹ️  Dev mode: Email not configured, but alert would have been sent`);
-            // Still mark as triggered in dev mode
-            alert.triggered = true;
-            alert.lastTriggeredAt = new Date();
-            if (alert.notifyOnce) {
-              alert.status = 'triggered';
-            }
-            await alert.save();
-            triggeredCount++;
-            totalTriggered++;
           }
+          
+          // Still save the alert as triggered even if email failed
+          if (alert.notifyOnce) {
+            alert.status = 'triggered';
+          }
+          await alert.save();
+          triggeredCount++;
+          totalTriggered++;
         }
       }
     }

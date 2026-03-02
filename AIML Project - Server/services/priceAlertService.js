@@ -311,7 +311,15 @@ const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, co
     console.log(`   To: ${email}`);
     console.log(`   Subject: ${subject}`);
     
-    const info = await transporter.sendMail(mailOptions);
+    // Set a timeout for email sending (10 seconds)
+    const sendEmailWithTimeout = Promise.race([
+      transporter.sendMail(mailOptions),
+      new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Email sending timeout after 10 seconds')), 10000)
+      )
+    ]);
+    
+    const info = await sendEmailWithTimeout;
     
     console.log('✅ Price alert email sent successfully!');
     console.log(`   Message ID: ${info.messageId}`);

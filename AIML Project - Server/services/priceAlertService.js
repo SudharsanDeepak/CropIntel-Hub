@@ -7,6 +7,15 @@ const createTransporter = () => {
         user: process.env.EMAIL_USER,
         pass: process.env.EMAIL_PASSWORD,
       },
+      pool: true,
+      maxConnections: 1,
+      rateDelta: 20000,
+      rateLimit: 5,
+      connectionTimeout: 30000, // 30 seconds
+      greetingTimeout: 30000,
+      socketTimeout: 30000,
+      debug: false,
+      logger: false
     });
   }
   return nodemailer.createTransport({
@@ -17,6 +26,9 @@ const createTransporter = () => {
       user: process.env.EMAIL_USER,
       pass: process.env.EMAIL_PASSWORD,
     },
+    connectionTimeout: 30000,
+    greetingTimeout: 30000,
+    socketTimeout: 30000
   });
 };
 const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, condition) => {
@@ -311,11 +323,11 @@ const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, co
     console.log(`   To: ${email}`);
     console.log(`   Subject: ${subject}`);
     
-    // Set a timeout for email sending (10 seconds)
+    // Set a timeout for email sending (30 seconds)
     const sendEmailWithTimeout = Promise.race([
       transporter.sendMail(mailOptions),
       new Promise((_, reject) => 
-        setTimeout(() => reject(new Error('Email sending timeout after 10 seconds')), 10000)
+        setTimeout(() => reject(new Error('Email sending timeout after 30 seconds')), 30000)
       )
     ]);
     

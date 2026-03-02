@@ -90,12 +90,18 @@ export const AuthProvider = ({ children }) => {
                 localStorage.setItem('token', token)
                 console.log('[DeepLink] Fetching user data')
                 
-                // Fetch user and wait for it to complete
-                await fetchCurrentUser(token)
-                
-                // Force a page reload to ensure the app shows logged-in state
-                console.log('[DeepLink] Reloading app to show logged-in state')
-                window.location.href = '/'
+                // Fetch user and WAIT for it to complete
+                try {
+                  await fetchCurrentUser(token)
+                  console.log('[DeepLink] User fetch completed successfully')
+                  
+                  // Don't reload - the user state update will trigger a re-render
+                  // showing the logged-in view
+                  toast.success('Login successful!')
+                } catch (error) {
+                  console.error('[DeepLink] Failed to fetch user:', error)
+                  toast.error('Failed to complete login. Please try again.')
+                }
               }
             } catch (error) {
               console.error('[DeepLink] Failed to parse OAuth success URL:', error)
@@ -146,12 +152,9 @@ export const AuthProvider = ({ children }) => {
       })
       
       console.log('[AuthContext] Raw response:', response)
-      console.log('[AuthContext] Response.data:', response.data)
-      console.log('[AuthContext] Response.data type:', typeof response.data)
-      console.log('[AuthContext] Response.data keys:', response.data ? Object.keys(response.data) : 'no data')
       
-      // Try to access data directly
-      const data = response.data
+      // Handle case where response might be the data itself (not response.data)
+      const data = response.data || response
       console.log('[AuthContext] Extracted data:', data)
       console.log('[AuthContext] Data.success:', data?.success)
       console.log('[AuthContext] Data.user:', data?.user)
@@ -160,6 +163,10 @@ export const AuthProvider = ({ children }) => {
         setUser(data.user)
         localStorage.setItem('user', JSON.stringify(data.user))
         console.log('[AuthContext] User authenticated:', data.user.email)
+        
+        // Close any open modals
+        setIsLoginOpen(false)
+        setIsSignupOpen(false)
       } else {
         console.log('[AuthContext] Auth failed - data:', data)
         localStorage.removeItem('token')

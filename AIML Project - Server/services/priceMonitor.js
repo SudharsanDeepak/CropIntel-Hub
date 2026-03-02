@@ -157,6 +157,7 @@ const startPriceMonitoring = () => {
   console.log('📧 Email notifications: Enabled');
   console.log('🔗 ML API: ' + ML_API);
   console.log('📅 Started at: ' + new Date().toLocaleString());
+  console.log('🔧 Using: setInterval (60000ms)');
   console.log('='.repeat(70) + '\n');
   
   // Run initial check immediately
@@ -167,13 +168,17 @@ const startPriceMonitoring = () => {
   
   // Use setInterval for reliable execution every minute (60000ms)
   // This is more reliable than node-cron on some cloud platforms
-  setInterval(() => {
+  const intervalId = setInterval(() => {
+    console.log(`\n⏰ [${new Date().toLocaleTimeString()}] Interval triggered - running scheduled check...`);
     checkPriceAlerts().catch(err => {
       console.error('❌ Scheduled check failed:', err.message);
     });
   }, 60000); // 60000ms = 1 minute
   
-  console.log('✅ Monitoring system active - checking every minute\n');
+  console.log('✅ Monitoring system active - checking every minute');
+  console.log(`✅ Interval ID: ${intervalId}\n`);
+  
+  return intervalId;
 };
 
 const triggerManualCheck = async () => {

@@ -86,6 +86,29 @@ app.get("/", (req, res) => {
   });
 });
 
+// Public monitoring stats endpoint (no auth required)
+app.get("/api/monitoring/stats", async (req, res) => {
+  try {
+    const { getMonitoringStats } = require('./services/priceMonitor');
+    const stats = getMonitoringStats();
+    const Alert = require('./models/Alert');
+    
+    const totalActiveAlerts = await Alert.countDocuments({ status: 'active', triggered: false });
+    const totalTriggeredAlerts = await Alert.countDocuments({ triggered: true });
+    
+    res.json({
+      monitoring: stats,
+      alerts: {
+        active: totalActiveAlerts,
+        triggered: totalTriggeredAlerts
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching monitoring stats:', error);
+    res.status(500).json({ error: 'Failed to fetch monitoring stats' });
+  }
+});
+
 // Health check endpoint
 app.get("/health", async (req, res) => {
   try {

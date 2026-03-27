@@ -21,7 +21,7 @@ export const useMarketData = () => {
         retry: shouldRetryQuery,
         staleTime: 5 * 60 * 1000, 
         refetchInterval: 5 * 60 * 1000, 
-        refetchIntervalInBackground: true, 
+        refetchIntervalInBackground: false, 
         onError: (error) => {
           toast.error(`Failed to fetch demand forecast: ${error.message}`)
         },
@@ -36,7 +36,7 @@ export const useMarketData = () => {
         retry: shouldRetryQuery,
         staleTime: 5 * 60 * 1000, 
         refetchInterval: 5 * 60 * 1000, 
-        refetchIntervalInBackground: true, 
+        refetchIntervalInBackground: false, 
         onError: (error) => {
           toast.error(`Failed to fetch price forecast: ${error.message}`)
         },
@@ -51,7 +51,7 @@ export const useMarketData = () => {
         retry: shouldRetryQuery,
         staleTime: 5 * 60 * 1000, 
         refetchInterval: 5 * 60 * 1000, 
-        refetchIntervalInBackground: true, 
+        refetchIntervalInBackground: false, 
         onError: (error) => {
           toast.error(`Failed to fetch stock analysis: ${error.message}`)
         },
@@ -66,7 +66,7 @@ export const useMarketData = () => {
         retry: shouldRetryQuery,
         staleTime: 5 * 60 * 1000, 
         refetchInterval: 5 * 60 * 1000, 
-        refetchIntervalInBackground: true, 
+        refetchIntervalInBackground: false, 
         onError: (error) => {
           toast.error(`Failed to fetch elasticity: ${error.message}`)
         },

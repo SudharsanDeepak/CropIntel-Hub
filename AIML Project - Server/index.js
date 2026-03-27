@@ -13,6 +13,7 @@ const ML_API = process.env.ML_API_URL || "http://localhost:8000"
 const UPSTREAM_CACHE_TTL_MS = 10 * 60 * 1000;
 const upstreamCache = new Map();
 const inFlightUpstreamRequests = new Map();
+const upstreamThrottleUntil = new Map();
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -44,6 +45,40 @@ const setCachedData = (cacheKey, data) => {
     timestamp: Date.now(),
     data,
   });
+};
+
+const parseRetryAfterMs = (retryAfterHeader) => {
+  if (!retryAfterHeader) {
+    return 5000;
+  }
+
+  const retryAfterSeconds = Number(retryAfterHeader);
+  if (Number.isFinite(retryAfterSeconds)) {
+    return Math.max(1000, retryAfterSeconds * 1000);
+  }
+
+  const retryDate = Date.parse(retryAfterHeader);
+  if (!Number.isNaN(retryDate)) {
+    return Math.max(1000, retryDate - Date.now());
+  }
+
+  return 5000;
+};
+
+const isUpstreamThrottled = (cacheKey) => {
+  const until = upstreamThrottleUntil.get(cacheKey);
+  if (!until) return false;
+
+  if (Date.now() >= until) {
+    upstreamThrottleUntil.delete(cacheKey);
+    return false;
+  }
+
+  return true;
+};
+
+const setUpstreamThrottled = (cacheKey, retryAfterHeader) => {
+  upstreamThrottleUntil.set(cacheKey, Date.now() + parseRetryAfterMs(retryAfterHeader));
 };
 
 const mapUpstreamStatus = (error) => {
@@ -314,6 +349,15 @@ app.get("/api/products/latest", async (req, res) => {
     if (category) params.category = category;
     if (search) params.search = search;
     const cacheKey = buildCacheKey("/products/latest", params);
+    const cached = getCachedData(cacheKey);
+
+    if (cached) {
+      return res.json(cached);
+    }
+
+    if (isUpstreamThrottled(cacheKey)) {
+      return res.status(429).json({ error: "Upstream service is temporarily rate limited" });
+    }
 
     const data = await requestMLApiCoalesced({
       cacheKey,
@@ -323,6 +367,7 @@ app.get("/api/products/latest", async (req, res) => {
       retries: 1,
     });
 
+    upstreamThrottleUntil.delete(cacheKey);
     setCachedData(cacheKey, data);
     res.json(data);
   } catch (error) {
@@ -335,6 +380,10 @@ app.get("/api/products/latest", async (req, res) => {
 
     const cacheKey = buildCacheKey("/products/latest", params);
     const cached = getCachedData(cacheKey);
+
+    if (error?.response?.status === 429) {
+      setUpstreamThrottled(cacheKey, error?.response?.headers?.["retry-after"]);
+    }
 
     if (cached) {
       return res.json(cached);
@@ -366,6 +415,15 @@ app.get("/api/demand", async (req, res) => {
     const days = req.query.days || 7;
     const params = { days };
     const cacheKey = buildCacheKey("/forecast/demand", params);
+    const cached = getCachedData(cacheKey);
+
+    if (cached) {
+      return res.json(cached);
+    }
+
+    if (isUpstreamThrottled(cacheKey)) {
+      return res.status(429).json({ error: "Upstream service is temporarily rate limited" });
+    }
 
     const data = await requestMLApiCoalesced({
       cacheKey,
@@ -375,6 +433,7 @@ app.get("/api/demand", async (req, res) => {
       retries: 1,
     });
 
+    upstreamThrottleUntil.delete(cacheKey);
     setCachedData(cacheKey, data);
     res.json(data);
   } catch (error) {
@@ -382,6 +441,10 @@ app.get("/api/demand", async (req, res) => {
     const days = req.query.days || 7;
     const cacheKey = buildCacheKey("/forecast/demand", { days });
     const cached = getCachedData(cacheKey);
+
+    if (error?.response?.status === 429) {
+      setUpstreamThrottled(cacheKey, error?.response?.headers?.["retry-after"]);
+    }
 
     if (cached) {
       return res.json(cached);
@@ -396,6 +459,15 @@ app.get("/api/price", async (req, res) => {
     const days = req.query.days || 7;
     const params = { days };
     const cacheKey = buildCacheKey("/forecast/price", params);
+    const cached = getCachedData(cacheKey);
+
+    if (cached) {
+      return res.json(cached);
+    }
+
+    if (isUpstreamThrottled(cacheKey)) {
+      return res.status(429).json({ error: "Upstream service is temporarily rate limited" });
+    }
 
     const data = await requestMLApiCoalesced({
       cacheKey,
@@ -405,6 +477,7 @@ app.get("/api/price", async (req, res) => {
       retries: 1,
     });
 
+    upstreamThrottleUntil.delete(cacheKey);
     setCachedData(cacheKey, data);
     res.json(data);
   } catch (error) {
@@ -412,6 +485,10 @@ app.get("/api/price", async (req, res) => {
     const days = req.query.days || 7;
     const cacheKey = buildCacheKey("/forecast/price", { days });
     const cached = getCachedData(cacheKey);
+
+    if (error?.response?.status === 429) {
+      setUpstreamThrottled(cacheKey, error?.response?.headers?.["retry-after"]);
+    }
 
     if (cached) {
       return res.json(cached);
@@ -441,6 +518,16 @@ app.get("/api/stock", async (req, res) => {
 app.get("/api/elasticity", async (req, res) => {
   try {
     const cacheKey = buildCacheKey("/analysis/elasticity");
+    const cached = getCachedData(cacheKey);
+
+    if (cached) {
+      return res.json(cached);
+    }
+
+    if (isUpstreamThrottled(cacheKey)) {
+      return res.status(429).json({ error: "Upstream service is temporarily rate limited" });
+    }
+
     const data = await requestMLApiCoalesced({
       cacheKey,
       endpoint: "/analysis/elasticity",
@@ -448,12 +535,17 @@ app.get("/api/elasticity", async (req, res) => {
       retries: 1,
     });
 
+    upstreamThrottleUntil.delete(cacheKey);
     setCachedData(cacheKey, data);
     res.json(data);
   } catch (error) {
     console.error("Elasticity API Error:", error.message);
     const cacheKey = buildCacheKey("/analysis/elasticity");
     const cached = getCachedData(cacheKey);
+
+    if (error?.response?.status === 429) {
+      setUpstreamThrottled(cacheKey, error?.response?.headers?.["retry-after"]);
+    }
 
     if (cached) {
       return res.json(cached);

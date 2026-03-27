@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Bell, Plus, X, Mail, TrendingDown, TrendingUp, Trash2, Edit, Check, AlertCircle, Search } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import axios from 'axios'
+import { marketAPI } from '../services/api'
 import { ToastContainer } from '../components/Toast'
 import { useToast } from '../hooks/useToast'
 import ConfirmModal from '../components/ConfirmModal'
@@ -38,10 +39,8 @@ const Alerts = () => {
   const fetchProducts = async () => {
     try {
       setIsLoading(true)
-      const response = await axios.get(`${API_URL}/api/products/latest`, {
-        timeout: 10000
-      })
-      setProducts(response.data || [])
+      const data = await marketAPI.getLatestProducts()
+      setProducts(data)
     } catch (err) {
       console.error('Error fetching products:', err)
       error('Failed to load products. Please refresh the page.')

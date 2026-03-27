@@ -1,13 +1,11 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { MessageCircle, X, Send, Bot, User, TrendingUp, DollarSign, Package, Calendar } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
-import axios from 'axios'
+import { marketAPI } from '../services/api'
 import { matchProducts } from '../utils/productMatcher'
 import { parseQuery } from '../utils/queryParser'
 import { ConversationManager } from '../utils/conversationManager'
 import { generateFallbackResponse } from '../utils/fallbackSystem'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 const MarketGuide = () => {
   const [isOpen, setIsOpen] = useState(false)
@@ -61,11 +59,9 @@ const MarketGuide = () => {
     isFetchingProductsRef.current = true
 
     try {
-      const response = await axios.get(`${API_URL}/api/products/latest`, {
-        timeout: 30000 // Increased to 30 seconds
-      })
+      const response = await marketAPI.getLatestProducts()
       if (isMountedRef.current) {
-        setProducts(Array.isArray(response.data) ? response.data : [])
+        setProducts(Array.isArray(response) ? response : [])
       }
     } catch (error) {
       console.error('Error fetching products:', error)

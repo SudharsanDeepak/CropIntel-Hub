@@ -1,10 +1,8 @@
 import { motion } from 'framer-motion'
 import { Calendar, TrendingUp, Package, DollarSign, BarChart3, Filter, RefreshCw } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
-import axios from 'axios'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+import { marketAPI } from '../services/api'
 
 const Forecast = () => {
   const [products, setProducts] = useState([])
@@ -19,10 +17,7 @@ const Forecast = () => {
   const fetchProducts = async () => {
     try {
       setIsLoading(true)
-      const response = await axios.get(`${API_URL}/api/products/latest`, {
-        timeout: 10000
-      })
-      const data = response.data || []
+      const data = await marketAPI.getLatestProducts()
       setProducts(data)
       if (data.length > 0) {
         setSelectedProduct(data[0].product)
@@ -38,11 +33,7 @@ const Forecast = () => {
   const fetchForecast = async (productName) => {
     try {
       setForecastLoading(true)
-      const response = await axios.get(
-        `${API_URL}/api/products/${encodeURIComponent(productName)}/forecast`,
-        { params: { days: 7 }, timeout: 5000 }
-      )
-      const data = response.data || []
+      const data = await marketAPI.getProductForecast(productName, 7)
       const formattedData = data.map(item => ({
         date: new Date(item.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
         price: parseFloat(item.predicted_price.toFixed(2)),

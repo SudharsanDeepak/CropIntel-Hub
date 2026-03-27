@@ -12,6 +12,7 @@ const ML_API = process.env.ML_API_URL || "http://localhost:8000"
 
 const UPSTREAM_CACHE_TTL_MS = 10 * 60 * 1000;
 const upstreamCache = new Map();
+const inFlightUpstreamRequests = new Map();
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -74,7 +75,7 @@ const requestMLApi = async ({ endpoint, params = {}, timeout = 30000, retries = 
     } catch (error) {
       lastError = error;
       const status = error?.response?.status;
-      const retriable = !status || status >= 500 || status === 429;
+      const retriable = !status || status >= 500;
 
       if (attempt < retries && retriable) {
         await delay(300 * (attempt + 1));
@@ -86,6 +87,23 @@ const requestMLApi = async ({ endpoint, params = {}, timeout = 30000, retries = 
   }
 
   throw lastError;
+};
+
+const requestMLApiCoalesced = async ({ cacheKey, endpoint, params = {}, timeout = 30000, retries = 1 }) => {
+  if (!cacheKey) {
+    return requestMLApi({ endpoint, params, timeout, retries });
+  }
+
+  if (inFlightUpstreamRequests.has(cacheKey)) {
+    return inFlightUpstreamRequests.get(cacheKey);
+  }
+
+  const requestPromise = requestMLApi({ endpoint, params, timeout, retries }).finally(() => {
+    inFlightUpstreamRequests.delete(cacheKey);
+  });
+
+  inFlightUpstreamRequests.set(cacheKey, requestPromise);
+  return requestPromise;
 };
 
 app.use(cors({
@@ -297,7 +315,8 @@ app.get("/api/products/latest", async (req, res) => {
     if (search) params.search = search;
     const cacheKey = buildCacheKey("/products/latest", params);
 
-    const data = await requestMLApi({
+    const data = await requestMLApiCoalesced({
+      cacheKey,
       endpoint: "/products/latest",
       params,
       timeout: 30000,
@@ -348,7 +367,8 @@ app.get("/api/demand", async (req, res) => {
     const params = { days };
     const cacheKey = buildCacheKey("/forecast/demand", params);
 
-    const data = await requestMLApi({
+    const data = await requestMLApiCoalesced({
+      cacheKey,
       endpoint: "/forecast/demand",
       params,
       timeout: 120000,
@@ -377,7 +397,8 @@ app.get("/api/price", async (req, res) => {
     const params = { days };
     const cacheKey = buildCacheKey("/forecast/price", params);
 
-    const data = await requestMLApi({
+    const data = await requestMLApiCoalesced({
+      cacheKey,
       endpoint: "/forecast/price",
       params,
       timeout: 120000,
@@ -420,7 +441,8 @@ app.get("/api/stock", async (req, res) => {
 app.get("/api/elasticity", async (req, res) => {
   try {
     const cacheKey = buildCacheKey("/analysis/elasticity");
-    const data = await requestMLApi({
+    const data = await requestMLApiCoalesced({
+      cacheKey,
       endpoint: "/analysis/elasticity",
       timeout: 60000,
       retries: 1,

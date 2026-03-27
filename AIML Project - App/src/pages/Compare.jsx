@@ -1,12 +1,10 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { GitCompare, X, Plus, TrendingUp, TrendingDown, DollarSign, Package, BarChart3, Search, Filter } from 'lucide-react'
 import { useState, useEffect, useMemo } from 'react'
-import axios from 'axios'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar } from 'recharts'
 import { ToastContainer } from '../components/Toast'
 import { useToast } from '../hooks/useToast'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+import { marketAPI } from '../services/api'
 
 const Compare = () => {
   const [products, setProducts] = useState([])
@@ -24,10 +22,8 @@ const Compare = () => {
   const fetchProducts = async () => {
     try {
       setIsLoading(true)
-      const response = await axios.get(`${API_URL}/api/products/latest`, {
-        timeout: 10000
-      })
-      setProducts(response.data || [])
+      const data = await marketAPI.getLatestProducts()
+      setProducts(data)
     } catch (error) {
       console.error('Error fetching products:', error)
       setProducts([])
@@ -37,11 +33,8 @@ const Compare = () => {
   }
   const fetchForecast = async (productName) => {
     try {
-      const response = await axios.get(
-        `${API_URL}/api/products/${encodeURIComponent(productName)}/forecast`,
-        { params: { days: 7 }, timeout: 5000 }
-      )
-      return response.data || []
+      const data = await marketAPI.getProductForecast(productName, 7)
+      return data
     } catch (error) {
       console.error('Error fetching forecast:', error)
       return []

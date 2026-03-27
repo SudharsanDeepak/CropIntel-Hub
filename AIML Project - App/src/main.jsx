@@ -8,11 +8,21 @@ import App from './App'
 import './index.css'
 import { StatusBar } from '@capacitor/status-bar'
 import { Capacitor } from '@capacitor/core'
+
+const shouldRetryDefaultQuery = (failureCount, error) => {
+  const status = error?.status || error?.response?.status
+  if (status === 429) {
+    return false
+  }
+
+  return failureCount < 1
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       refetchOnWindowFocus: false,
-      retry: 1,
+      retry: shouldRetryDefaultQuery,
       staleTime: 5 * 60 * 1000, 
     },
   },

@@ -2,9 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Search, TrendingUp, TrendingDown, X, Calendar, Package, DollarSign, BarChart3 } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
-import axios from 'axios'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
+import { marketAPI } from '../services/api'
 
 const PriceTracker = () => {
   const location = useLocation()
@@ -34,10 +32,8 @@ const PriceTracker = () => {
   const fetchProducts = async () => {
     try {
       setIsLoading(true)
-      const response = await axios.get(`${API_URL}/api/products/latest`, {
-        timeout: 10000 
-      })
-      setProducts(response.data || [])
+      const data = await marketAPI.getLatestProducts()
+      setProducts(data)
     } catch (error) {
       console.error('Error fetching products:', error)
       setProducts([])
@@ -48,11 +44,8 @@ const PriceTracker = () => {
   const fetchProductForecast = async (productName) => {
     try {
       setForecastLoading(true)
-      const response = await axios.get(
-        `${API_URL}/api/products/${encodeURIComponent(productName)}/forecast`,
-        { params: { days: 7 }, timeout: 5000 }
-      )
-      setProductForecast(response.data || [])
+      const data = await marketAPI.getProductForecast(productName, 7)
+      setProductForecast(data)
     } catch (error) {
       console.error('Error fetching forecast:', error)
       setProductForecast([])

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, ComposedChart } from 'recharts'
+import { marketAPI } from '../services/api'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const WEATHER_API_KEY = '4d8fb5b93d4af21d66a2948710284366' 
@@ -48,10 +49,7 @@ const Analytics = () => {
   const fetchProducts = async () => {
     try {
       setIsLoading(true)
-      const response = await axios.get(`${API_URL}/api/products/latest`, {
-        timeout: 10000
-      })
-      const data = response.data || []
+      const data = await marketAPI.getLatestProducts()
       setProducts(data)
       // Set first product as default for weather impact
       if (data.length > 0 && !selectedWeatherProduct) {

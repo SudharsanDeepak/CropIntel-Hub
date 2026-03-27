@@ -1,4 +1,16 @@
 const nodemailer = require('nodemailer');
+
+const normalizeBaseUrl = (value, fallback) => {
+  const candidate = String(value || fallback || '').trim();
+  return candidate.replace(/\/+$/, '');
+};
+
+const joinUrl = (baseUrl, path) => {
+  const cleanBase = normalizeBaseUrl(baseUrl, '');
+  const cleanPath = String(path || '').replace(/^\/+/, '');
+  return cleanPath ? `${cleanBase}/${cleanPath}` : cleanBase;
+};
+
 const createTransporter = () => {
   const normalizedUser = String(process.env.EMAIL_USER || '').trim();
   const normalizedPassword = String(process.env.EMAIL_PASSWORD || '').replace(/\s+/g, '');
@@ -36,7 +48,15 @@ const createTransporter = () => {
 };
 const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, condition) => {
   try {
-    const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+    const FRONTEND_URL = normalizeBaseUrl(process.env.FRONTEND_URL, 'http://localhost:5173');
+    const API_BASE_URL = normalizeBaseUrl(
+      process.env.ALERT_API_URL || process.env.BACKEND_URL,
+      'http://localhost:5000'
+    );
+    const TRACKER_URL = joinUrl(FRONTEND_URL, '/tracker');
+    const ALERTS_URL = joinUrl(FRONTEND_URL, '/alerts');
+    const FORECAST_URL = joinUrl(FRONTEND_URL, '/forecast');
+    const MONITORING_API_URL = joinUrl(API_BASE_URL, '/api/monitoring/stats');
     
     console.log(`📧 Attempting to send email to: ${email}`);
     console.log(`   EMAIL_USER configured: ${process.env.EMAIL_USER ? 'Yes' : 'No'}`);
@@ -426,9 +446,12 @@ const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, co
               </p>
             </div>
             
-            <div style="text-align: center;">
-              <a href="${FRONTEND_URL}/tracker" style="display: inline-block; padding: 14px 32px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 24px 0;">
+            <div class="cta-button-wrapper">
+              <a href="${TRACKER_URL}" class="cta-button" style="margin-right: 8px;">
                 View Price Tracker →
+              </a>
+              <a href="${MONITORING_API_URL}" class="cta-button" style="margin-left: 8px; background: linear-gradient(135deg, #0ea5e9 0%, #2563eb 100%);">
+                View Deployed API →
               </a>
             </div>
             
@@ -443,9 +466,9 @@ const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, co
             <div class="footer-brand">CropIntel HUB</div>
             <div class="footer-tagline">AI-powered market insights for fruits & vegetables</div>
             <div class="footer-links">
-              <a href="${FRONTEND_URL}/alerts">Manage Alerts</a>
-              <a href="${FRONTEND_URL}/tracker">Price Tracker</a>
-              <a href="${FRONTEND_URL}/forecast">Forecasts</a>
+              <a href="${ALERTS_URL}">Manage Alerts</a>
+              <a href="${TRACKER_URL}">Price Tracker</a>
+              <a href="${FORECAST_URL}">Forecasts</a>
             </div>
           </div>
         </div>

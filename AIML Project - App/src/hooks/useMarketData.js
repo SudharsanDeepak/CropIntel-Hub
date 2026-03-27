@@ -1,6 +1,16 @@
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { marketAPI } from '../services/api'
 import toast from 'react-hot-toast'
+
+const shouldRetryQuery = (failureCount, error) => {
+  const status = error?.status || error?.response?.status
+  if (status === 429 || status >= 500) {
+    return false
+  }
+
+  return failureCount < 1
+}
+
 export const useMarketData = () => {
   const queryClient = useQueryClient()
   const useDemandForecast = (days = 7) => {
@@ -8,6 +18,7 @@ export const useMarketData = () => {
       ['demandForecast', days],
       () => marketAPI.getDemandForecast(days),
       {
+        retry: shouldRetryQuery,
         staleTime: 5 * 60 * 1000, 
         refetchInterval: 5 * 60 * 1000, 
         refetchIntervalInBackground: true, 
@@ -22,6 +33,7 @@ export const useMarketData = () => {
       ['priceForecast', days],
       () => marketAPI.getPriceForecast(days),
       {
+        retry: shouldRetryQuery,
         staleTime: 5 * 60 * 1000, 
         refetchInterval: 5 * 60 * 1000, 
         refetchIntervalInBackground: true, 
@@ -36,6 +48,7 @@ export const useMarketData = () => {
       ['stockAnalysis', days],
       () => marketAPI.getStockAnalysis(days),
       {
+        retry: shouldRetryQuery,
         staleTime: 5 * 60 * 1000, 
         refetchInterval: 5 * 60 * 1000, 
         refetchIntervalInBackground: true, 
@@ -50,6 +63,7 @@ export const useMarketData = () => {
       'elasticity',
       () => marketAPI.getElasticity(),
       {
+        retry: shouldRetryQuery,
         staleTime: 5 * 60 * 1000, 
         refetchInterval: 5 * 60 * 1000, 
         refetchIntervalInBackground: true, 

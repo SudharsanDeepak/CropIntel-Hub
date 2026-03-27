@@ -26,12 +26,22 @@ const MarketGuide = () => {
   const messagesEndRef = useRef(null)
   const productRefreshInterval = useRef(null)
   const debounceTimeout = useRef(null)
+  const retryTimeoutRef = useRef(null)
+  const isFetchingProductsRef = useRef(false)
+  const isMountedRef = useRef(true)
+
   useEffect(() => {
+    isMountedRef.current = true
     fetchProducts()
-    productRefreshInterval.current = setInterval(fetchProducts, 5 * 60 * 1000)
+    productRefreshInterval.current = setInterval(() => fetchProducts(0), 5 * 60 * 1000)
+
     return () => {
+      isMountedRef.current = false
       if (productRefreshInterval.current) {
         clearInterval(productRefreshInterval.current)
+      }
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current)
       }
     }
   }, [])
@@ -44,23 +54,39 @@ const MarketGuide = () => {
     }
   }, [isOpen, conversationManager])
   const fetchProducts = async (retryCount = 0) => {
+    if (isFetchingProductsRef.current) {
+      return
+    }
+
+    isFetchingProductsRef.current = true
+
     try {
       const response = await axios.get(`${API_URL}/api/products/latest`, {
         timeout: 30000 // Increased to 30 seconds
       })
-      setProducts(response.data || [])
+      if (isMountedRef.current) {
+        setProducts(Array.isArray(response.data) ? response.data : [])
+      }
     } catch (error) {
       console.error('Error fetching products:', error)
-      
-      // Retry logic: retry up to 2 times with exponential backoff
-      if (retryCount < 2) {
+
+      const status = error?.response?.status
+      const canRetry = retryCount < 2 && status !== 429 && (!status || status >= 500)
+
+      // Retry only for transient backend/network errors with exponential backoff.
+      if (canRetry) {
         const delay = Math.pow(2, retryCount) * 1000 // 1s, 2s
         console.log(`Retrying in ${delay}ms... (attempt ${retryCount + 1}/2)`)
-        setTimeout(() => fetchProducts(retryCount + 1), delay)
+        if (retryTimeoutRef.current) {
+          clearTimeout(retryTimeoutRef.current)
+        }
+        retryTimeoutRef.current = setTimeout(() => fetchProducts(retryCount + 1), delay)
       } else {
         // Keep existing products if fetch fails after retries
         console.warn('Failed to fetch products after retries, using cached data')
       }
+    } finally {
+      isFetchingProductsRef.current = false
     }
   }
   const scrollToBottom = () => {

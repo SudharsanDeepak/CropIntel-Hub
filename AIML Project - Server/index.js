@@ -10,6 +10,84 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const ML_API = process.env.ML_API_URL || "http://localhost:8000"
 
+const UPSTREAM_CACHE_TTL_MS = 10 * 60 * 1000;
+const upstreamCache = new Map();
+
+const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const buildCacheKey = (endpoint, params = {}) => {
+  const sortedParams = Object.keys(params)
+    .sort()
+    .reduce((acc, key) => {
+      acc[key] = params[key];
+      return acc;
+    }, {});
+  return `${endpoint}:${JSON.stringify(sortedParams)}`;
+};
+
+const getCachedData = (cacheKey) => {
+  const cached = upstreamCache.get(cacheKey);
+  if (!cached) return null;
+
+  const age = Date.now() - cached.timestamp;
+  if (age > UPSTREAM_CACHE_TTL_MS) {
+    upstreamCache.delete(cacheKey);
+    return null;
+  }
+
+  return cached.data;
+};
+
+const setCachedData = (cacheKey, data) => {
+  upstreamCache.set(cacheKey, {
+    timestamp: Date.now(),
+    data,
+  });
+};
+
+const mapUpstreamStatus = (error) => {
+  if (error?.response?.status) {
+    return error.response.status;
+  }
+
+  if (error?.code === "ECONNABORTED") {
+    return 504;
+  }
+
+  if (["ECONNREFUSED", "ENOTFOUND", "EAI_AGAIN", "ERR_NETWORK"].includes(error?.code)) {
+    return 503;
+  }
+
+  return 500;
+};
+
+const requestMLApi = async ({ endpoint, params = {}, timeout = 30000, retries = 1 }) => {
+  let lastError;
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const response = await axios.get(`${ML_API}${endpoint}`, {
+        params,
+        timeout,
+      });
+      return response.data;
+    } catch (error) {
+      lastError = error;
+      const status = error?.response?.status;
+      const retriable = !status || status >= 500 || status === 429;
+
+      if (attempt < retries && retriable) {
+        await delay(300 * (attempt + 1));
+        continue;
+      }
+
+      throw error;
+    }
+  }
+
+  throw lastError;
+};
+
 app.use(cors({
   origin: function(origin, callback) {
     const allowedOrigins = [
@@ -217,18 +295,37 @@ app.get("/api/products/latest", async (req, res) => {
     if (limit) params.limit = limit;
     if (category) params.category = category;
     if (search) params.search = search;
-    const response = await axios.get(`${ML_API}/products/latest`, {
+    const cacheKey = buildCacheKey("/products/latest", params);
+
+    const data = await requestMLApi({
+      endpoint: "/products/latest",
       params,
-      timeout: 30000, // Increased to 30 seconds
+      timeout: 30000,
+      retries: 1,
     });
-    res.json(response.data);
+
+    setCachedData(cacheKey, data);
+    res.json(data);
   } catch (error) {
     console.error("Products API Error:", error.message);
-    if (error.code === 'ECONNABORTED') {
-      res.status(504).json({ error: "Request timeout - ML service is taking longer than expected" });
-    } else {
-      res.status(500).json({ error: "Failed to fetch products", message: error.message });
+    const { limit, category, search } = req.query;
+    const params = {};
+    if (limit) params.limit = limit;
+    if (category) params.category = category;
+    if (search) params.search = search;
+
+    const cacheKey = buildCacheKey("/products/latest", params);
+    const cached = getCachedData(cacheKey);
+
+    if (cached) {
+      return res.json(cached);
     }
+
+    const status = mapUpstreamStatus(error);
+    return res.status(status).json({
+      error: "Failed to fetch products",
+      message: error.message,
+    });
   }
 });
 app.get("/api/products/:productName/forecast", async (req, res) => {
@@ -248,35 +345,59 @@ app.get("/api/products/:productName/forecast", async (req, res) => {
 app.get("/api/demand", async (req, res) => {
   try {
     const days = req.query.days || 7;
-    const response = await axios.get(`${ML_API}/forecast/demand`, {
-      params: { days },
-      timeout: 120000, 
+    const params = { days };
+    const cacheKey = buildCacheKey("/forecast/demand", params);
+
+    const data = await requestMLApi({
+      endpoint: "/forecast/demand",
+      params,
+      timeout: 120000,
+      retries: 1,
     });
-    res.json(response.data);
+
+    setCachedData(cacheKey, data);
+    res.json(data);
   } catch (error) {
     console.error("Demand API Error:", error.message);
-    if (error.code === 'ECONNABORTED') {
-      res.status(504).json({ error: "Request timeout - ML service is processing large dataset" });
-    } else {
-      res.status(500).json({ error: "Demand service error", message: error.message });
+    const days = req.query.days || 7;
+    const cacheKey = buildCacheKey("/forecast/demand", { days });
+    const cached = getCachedData(cacheKey);
+
+    if (cached) {
+      return res.json(cached);
     }
+
+    const status = mapUpstreamStatus(error);
+    return res.status(status).json({ error: "Demand service error", message: error.message });
   }
 });
 app.get("/api/price", async (req, res) => {
   try {
     const days = req.query.days || 7;
-    const response = await axios.get(`${ML_API}/forecast/price`, {
-      params: { days },
-      timeout: 120000, 
+    const params = { days };
+    const cacheKey = buildCacheKey("/forecast/price", params);
+
+    const data = await requestMLApi({
+      endpoint: "/forecast/price",
+      params,
+      timeout: 120000,
+      retries: 1,
     });
-    res.json(response.data);
+
+    setCachedData(cacheKey, data);
+    res.json(data);
   } catch (error) {
     console.error("Price API Error:", error.message);
-    if (error.code === 'ECONNABORTED') {
-      res.status(504).json({ error: "Request timeout - ML service is processing large dataset" });
-    } else {
-      res.status(500).json({ error: "Price service error", message: error.message });
+    const days = req.query.days || 7;
+    const cacheKey = buildCacheKey("/forecast/price", { days });
+    const cached = getCachedData(cacheKey);
+
+    if (cached) {
+      return res.json(cached);
     }
+
+    const status = mapUpstreamStatus(error);
+    return res.status(status).json({ error: "Price service error", message: error.message });
   }
 });
 app.get("/api/stock", async (req, res) => {
@@ -298,17 +419,26 @@ app.get("/api/stock", async (req, res) => {
 });
 app.get("/api/elasticity", async (req, res) => {
   try {
-    const response = await axios.get(`${ML_API}/analysis/elasticity`, {
-      timeout: 60000, 
+    const cacheKey = buildCacheKey("/analysis/elasticity");
+    const data = await requestMLApi({
+      endpoint: "/analysis/elasticity",
+      timeout: 60000,
+      retries: 1,
     });
-    res.json(response.data);
+
+    setCachedData(cacheKey, data);
+    res.json(data);
   } catch (error) {
     console.error("Elasticity API Error:", error.message);
-    if (error.code === 'ECONNABORTED') {
-      res.status(504).json({ error: "Request timeout - ML service is processing large dataset" });
-    } else {
-      res.status(500).json({ error: "Elasticity service error", message: error.message });
+    const cacheKey = buildCacheKey("/analysis/elasticity");
+    const cached = getCachedData(cacheKey);
+
+    if (cached) {
+      return res.json(cached);
     }
+
+    const status = mapUpstreamStatus(error);
+    return res.status(status).json({ error: "Elasticity service error", message: error.message });
   }
 });
 app.post("/api/data/update", async (req, res) => {

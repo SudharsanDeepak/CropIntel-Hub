@@ -26,18 +26,20 @@ const shouldUseDevMode = () => {
 };
 
 const shouldFallbackOnEmailError = () => {
-  // Default behavior keeps OTP flow available even when SMTP fails.
-  // Set OTP_FALLBACK_MODE=strict to disable fallback in hardened environments.
-  return String(process.env.OTP_FALLBACK_MODE || '').toLowerCase() !== 'strict';
+  // Keep fallback opt-in only. Set OTP_FALLBACK_MODE=true to allow dev fallback on SMTP errors.
+  return String(process.env.OTP_FALLBACK_MODE || '').toLowerCase() === 'true';
 };
 
 const createTransporter = () => {
+  const normalizedUser = String(process.env.EMAIL_USER || '').trim();
+  const normalizedPassword = String(process.env.EMAIL_PASSWORD || '').replace(/\s+/g, '');
+
   if (process.env.EMAIL_SERVICE === 'gmail') {
     return nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD, 
+        user: normalizedUser,
+        pass: normalizedPassword,
       },
     });
   }
@@ -46,8 +48,8 @@ const createTransporter = () => {
     port: process.env.SMTP_PORT || 587,
     secure: process.env.SMTP_SECURE === 'true',
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD,
+      user: normalizedUser,
+      pass: normalizedPassword,
     },
   });
 };

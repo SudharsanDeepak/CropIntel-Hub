@@ -9,6 +9,14 @@ const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
+
+const buildOtpEmailFailureMessage = (errorText = '') => {
+  const lower = String(errorText).toLowerCase();
+  if (lower.includes('535') || lower.includes('badcredentials') || lower.includes('username and password not accepted')) {
+    return 'Email authentication failed. Update EMAIL_USER/EMAIL_PASSWORD with a valid Gmail app password and restart the backend.';
+  }
+  return 'Failed to send OTP email. Please try again.';
+};
 router.post('/send-otp-signup', async (req, res) => {
   try {
     const { email } = req.body;
@@ -53,9 +61,11 @@ router.post('/send-otp-signup', async (req, res) => {
     
     if (!emailResult.success && !emailResult.devMode) {
       console.error('❌ Email sending failed:', emailResult.error);
+      const message = buildOtpEmailFailureMessage(emailResult.error);
       return res.status(500).json({ 
         success: false, 
-        message: 'Failed to send OTP email. Please try again.' 
+        message,
+        error: process.env.NODE_ENV === 'development' ? emailResult.error : undefined,
       });
     }
     
@@ -180,9 +190,11 @@ router.post('/send-otp-login', async (req, res) => {
     await otpDoc.save();
     const emailResult = await sendOTPEmail(email, otp, 'login');
     if (!emailResult.success) {
+      const message = buildOtpEmailFailureMessage(emailResult.error);
       return res.status(500).json({ 
         success: false, 
-        message: 'Failed to send OTP email. Please try again.' 
+        message,
+        error: process.env.NODE_ENV === 'development' ? emailResult.error : undefined,
       });
     }
     const response = {

@@ -1,11 +1,14 @@
 const nodemailer = require('nodemailer');
 const createTransporter = () => {
+  const normalizedUser = String(process.env.EMAIL_USER || '').trim();
+  const normalizedPassword = String(process.env.EMAIL_PASSWORD || '').replace(/\s+/g, '');
+
   if (process.env.EMAIL_SERVICE === 'gmail') {
     return nodemailer.createTransport({
       service: 'gmail',
       auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD,
+        user: normalizedUser,
+        pass: normalizedPassword,
       },
       pool: true,
       maxConnections: 1,
@@ -23,8 +26,8 @@ const createTransporter = () => {
     port: process.env.SMTP_PORT || 587,
     secure: process.env.SMTP_SECURE === 'true',
     auth: {
-      user: process.env.EMAIL_USER,
-      pass: process.env.EMAIL_PASSWORD,
+      user: normalizedUser,
+      pass: normalizedPassword,
     },
     connectionTimeout: 30000,
     greetingTimeout: 30000,
@@ -69,130 +72,176 @@ const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, co
         <title>Price Alert</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
+          html { -webkit-text-size-adjust: 100%; -ms-text-size-adjust: 100%; }
           body { 
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
             line-height: 1.6; 
             color: #1f2937; 
             background-color: #f3f4f6;
-            padding: 20px;
+            padding: 0;
+            margin: 0;
+            width: 100%;
+            min-height: 100vh;
           }
+          table { border-collapse: collapse; border-spacing: 0; width: 100%; }
+          td, th { vertical-align: top; }
+          img { border: 0; outline: none; text-decoration: none; -ms-interpolation-mode: nearest-neighbor; }
+          
+          /* Container */
           .email-wrapper { 
             max-width: 600px; 
             margin: 0 auto; 
             background: #ffffff;
-            border-radius: 16px;
+            border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
           }
+          
+          /* Header */
           .header { 
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 40px 30px;
+            padding: 48px 24px;
             text-align: center;
           }
           .header-icon {
-            width: 60px;
-            height: 60px;
-            background: rgba(255, 255, 255, 0.2);
+            width: 70px;
+            height: 70px;
+            background: rgba(255, 255, 255, 0.15);
             border-radius: 50%;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            font-size: 32px;
-            margin-bottom: 16px;
+            font-size: 36px;
+            margin: 0 auto 16px;
+            line-height: 1;
           }
           .header h1 { 
             color: #ffffff;
-            font-size: 24px;
-            font-weight: 600;
-            margin: 0;
+            font-size: 26px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            line-height: 1.3;
           }
           .header p {
             color: rgba(255, 255, 255, 0.9);
-            font-size: 14px;
-            margin-top: 8px;
+            font-size: 15px;
+            margin: 0;
+            line-height: 1.4;
           }
+          
+          /* Content */
           .content { 
-            padding: 40px 30px;
+            padding: 32px 24px;
           }
           .product-section {
             text-align: center;
-            margin-bottom: 32px;
+            margin-bottom: 28px;
+            border-bottom: 1px solid #e5e7eb;
+            padding-bottom: 24px;
           }
           .product-name {
-            font-size: 32px;
+            font-size: 28px;
             font-weight: 700;
             color: #111827;
-            margin-bottom: 8px;
+            margin-bottom: 12px;
+            line-height: 1.2;
+            word-break: break-word;
           }
           .product-status {
             display: inline-block;
-            padding: 6px 16px;
+            padding: 6px 14px;
             background: ${condition === 'below' ? '#d1fae5' : '#fee2e2'};
             color: ${condition === 'below' ? '#065f46' : '#991b1b'};
-            border-radius: 20px;
-            font-size: 14px;
+            border-radius: 16px;
+            font-size: 13px;
             font-weight: 600;
+            line-height: 1;
+            white-space: nowrap;
           }
+          
+          /* Price Cards */
           .price-comparison {
-            display: flex;
-            gap: 16px;
-            margin: 32px 0;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+            margin: 28px 0;
           }
           .price-card {
-            flex: 1;
             background: #f9fafb;
             border: 2px solid #e5e7eb;
             border-radius: 12px;
-            padding: 24px;
+            padding: 20px 16px;
             text-align: center;
+            transition: all 0.3s ease;
           }
           .price-card.highlight {
             background: ${condition === 'below' ? '#ecfdf5' : '#fef2f2'};
             border-color: ${condition === 'below' ? '#10b981' : '#ef4444'};
+            box-shadow: 0 2px 8px ${condition === 'below' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)'};
           }
           .price-label {
-            font-size: 12px;
-            font-weight: 600;
+            font-size: 11px;
+            font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 0.5px;
             color: #6b7280;
             margin-bottom: 8px;
+            display: block;
           }
           .price-value {
-            font-size: 36px;
+            font-size: 32px;
             font-weight: 700;
             color: ${condition === 'below' ? '#10b981' : '#ef4444'};
             line-height: 1;
+            margin-bottom: 4px;
           }
           .price-unit {
-            font-size: 16px;
+            font-size: 14px;
             color: #9ca3af;
             font-weight: 500;
+            display: block;
           }
+          
+          /* Message Box */
           .message-box {
-            background: ${condition === 'below' ? '#ecfdf5' : '#fef2f2'};
+            background: ${condition === 'below' ? '#f0fdf4' : '#fef2f2'};
             border-left: 4px solid ${condition === 'below' ? '#10b981' : '#ef4444'};
-            padding: 20px;
             border-radius: 8px;
+            padding: 18px 16px;
             margin: 24px 0;
           }
           .message-box p {
             color: #374151;
-            font-size: 15px;
+            font-size: 14px;
             margin: 0;
+            line-height: 1.5;
+          }
+          
+          /* CTA Button */
+          .cta-button-wrapper {
+            text-align: center;
+            margin: 28px 0;
           }
           .cta-button {
             display: inline-block;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: #ffffff;
-            padding: 14px 32px;
+            padding: 14px 36px;
             text-decoration: none;
             border-radius: 8px;
             font-weight: 600;
             font-size: 15px;
-            margin: 24px 0;
-            transition: transform 0.2s;
+            line-height: 1;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+            min-width: 140px;
           }
+          .cta-button:hover {
+            transform: translateY(-2px);
+          }
+          
+          /* Info Box */
           .info-box {
             background: #eff6ff;
             border: 1px solid #bfdbfe;
@@ -202,12 +251,15 @@ const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, co
           }
           .info-box p {
             color: #1e40af;
-            font-size: 14px;
+            font-size: 13px;
             margin: 0;
+            line-height: 1.5;
           }
+          
+          /* Footer */
           .footer {
             background: #f9fafb;
-            padding: 32px 30px;
+            padding: 28px 24px;
             text-align: center;
             border-top: 1px solid #e5e7eb;
           }
@@ -215,30 +267,119 @@ const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, co
             font-size: 18px;
             font-weight: 700;
             color: #111827;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
+            line-height: 1;
           }
           .footer-tagline {
             color: #6b7280;
-            font-size: 14px;
-            margin-bottom: 20px;
+            font-size: 13px;
+            margin-bottom: 16px;
+            line-height: 1.4;
           }
           .footer-links {
-            margin: 20px 0;
+            margin: 0;
+            padding: 0;
           }
           .footer-links a {
             color: #667eea;
             text-decoration: none;
-            font-size: 14px;
-            margin: 0 12px;
+            font-size: 13px;
             font-weight: 500;
+            display: inline-block;
+            margin: 0 8px;
+            line-height: 1.6;
           }
-          @media only screen and (max-width: 600px) {
-            body { padding: 10px; }
-            .content { padding: 24px 20px; }
-            .header { padding: 32px 20px; }
-            .product-name { font-size: 24px; }
-            .price-value { font-size: 28px; }
-            .price-comparison { flex-direction: column; }
+          
+          /* Mobile Responsiveness */
+          @media only screen and (max-width: 640px) {
+            body { padding: 8px; }
+            .email-wrapper { border-radius: 8px; }
+            .header { 
+              padding: 36px 16px; 
+              border-radius: 8px 8px 0 0;
+            }
+            .header-icon {
+              width: 60px;
+              height: 60px;
+              font-size: 32px;
+              margin-bottom: 12px;
+            }
+            .header h1 { font-size: 22px; }
+            .header p { font-size: 14px; }
+            .content { 
+              padding: 24px 16px; 
+            }
+            .product-section {
+              margin-bottom: 20px;
+              padding-bottom: 18px;
+            }
+            .product-name { 
+              font-size: 24px; 
+              margin-bottom: 10px;
+            }
+            .price-comparison {
+              gap: 12px;
+              margin: 20px 0;
+            }
+            .price-card {
+              padding: 18px 14px;
+            }
+            .price-label { font-size: 10px; }
+            .price-value { 
+              font-size: 26px; 
+              margin-bottom: 3px;
+            }
+            .price-unit { font-size: 12px; }
+            .message-box {
+              padding: 16px 14px;
+              margin: 20px 0;
+            }
+            .message-box p { font-size: 13px; }
+            .cta-button-wrapper { margin: 20px 0; }
+            .cta-button {
+              padding: 12px 32px;
+              font-size: 14px;
+              min-width: 120px;
+              width: 100%;
+              max-width: 240px;
+            }
+            .info-box {
+              padding: 14px;
+              margin: 20px 0;
+            }
+            .info-box p { font-size: 12px; }
+            .footer { 
+              padding: 24px 16px; 
+            }
+            .footer-brand { font-size: 16px; }
+            .footer-tagline { font-size: 12px; }
+            .footer-links a { 
+              font-size: 12px;
+              margin: 0 6px;
+              display: block;
+              margin-bottom: 6px;
+            }
+          }
+          
+          /* Tablet Responsiveness */
+          @media only screen and (max-width: 480px) {
+            .header h1 { font-size: 20px; }
+            .product-name { font-size: 22px; }
+            .price-value { font-size: 24px; }
+            .price-comparison {
+              gap: 10px;
+            }
+            .price-card {
+              padding: 16px 12px;
+            }
+            .content { padding: 20px 14px; }
+          }
+          
+          /* High Resolution Displays */
+          @media only screen and (-webkit-min-device-pixel-ratio: 2) and (max-width: 600px) {
+            .email-wrapper {
+              box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+            }
           }
         </style>
       </head>
@@ -293,9 +434,9 @@ const sendPriceAlertEmail = async (email, product, currentPrice, targetPrice, co
             
             <div class="info-box">
               <p>
-                <strong>💡 Tip:</strong> Market prices fluctuate throughout the day. Check the Price Tracker for real-time updates and 7-day forecasts.
-              </p>
-            </div>
+                  <strong>💡 Tip:</strong> Market prices fluctuate throughout the day. Check the Price Tracker for real-time updates and 7-day forecasts.
+                </p>
+              </div>
           </div>
           
           <div class="footer">

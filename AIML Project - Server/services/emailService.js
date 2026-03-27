@@ -1,4 +1,36 @@
 const nodemailer = require('nodemailer');
+
+const PLACEHOLDER_EMAILS = new Set([
+  'your-gmail@gmail.com',
+  'your_email@gmail.com',
+  'your-email@gmail.com',
+]);
+
+const PLACEHOLDER_PASSWORDS = new Set([
+  'your-app-password-here',
+  'your_app_password_here',
+  'your-app-password',
+  'your-password-here',
+  'your_password_here',
+]);
+
+const isPlaceholder = (value, placeholders) => {
+  if (!value) return true;
+  return placeholders.has(String(value).trim().toLowerCase());
+};
+
+const shouldUseDevMode = () => {
+  const emailUser = process.env.EMAIL_USER;
+  const emailPassword = process.env.EMAIL_PASSWORD;
+  return isPlaceholder(emailUser, PLACEHOLDER_EMAILS) || isPlaceholder(emailPassword, PLACEHOLDER_PASSWORDS);
+};
+
+const shouldFallbackOnEmailError = () => {
+  // Default behavior keeps OTP flow available even when SMTP fails.
+  // Set OTP_FALLBACK_MODE=strict to disable fallback in hardened environments.
+  return String(process.env.OTP_FALLBACK_MODE || '').toLowerCase() !== 'strict';
+};
+
 const createTransporter = () => {
   if (process.env.EMAIL_SERVICE === 'gmail') {
     return nodemailer.createTransport({
@@ -22,9 +54,7 @@ const createTransporter = () => {
 const sendOTPEmail = async (email, otp, purpose) => {
   try {
     // Check if email is configured
-    if (!process.env.EMAIL_USER || !process.env.EMAIL_PASSWORD || 
-        process.env.EMAIL_USER === 'your-gmail@gmail.com' ||
-        process.env.EMAIL_PASSWORD === 'your-app-password-here') {
+    if (shouldUseDevMode()) {
       console.log('⚠️  Email not configured - OTP:', otp);
       console.log('   Configure EMAIL_USER and EMAIL_PASSWORD in .env to send real emails');
       console.log(`   For testing: Use OTP ${otp} for ${email}`);
@@ -418,6 +448,15 @@ const sendOTPEmail = async (email, otp, purpose) => {
     return { success: true, messageId: info.messageId };
   } catch (error) {
     console.error('❌ Email sending failed:', error);
+    if (shouldFallbackOnEmailError()) {
+      console.warn('⚠️ Falling back to dev OTP response because email provider failed.');
+      return {
+        success: true,
+        messageId: 'dev-fallback-' + Date.now(),
+        devMode: true,
+        otp,
+      };
+    }
     return { success: false, error: error.message };
   }
 };

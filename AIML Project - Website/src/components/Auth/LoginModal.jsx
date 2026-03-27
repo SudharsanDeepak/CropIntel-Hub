@@ -143,6 +143,7 @@ const LoginModal = () => {
                             onChange={(e) => setEmail(e.target.value)}
                             className="input-field pl-10"
                             placeholder="you@example.com"
+                            autoComplete="email"
                             required
                           />
                         </div>
@@ -160,6 +161,7 @@ const LoginModal = () => {
                             onChange={(e) => setPassword(e.target.value)}
                             className="input-field pl-10 pr-10"
                             placeholder="••••••••"
+                            autoComplete="current-password"
                             required
                           />
                           <button
@@ -219,6 +221,7 @@ const LoginModal = () => {
                           className="input-field text-center text-2xl tracking-widest font-bold"
                           placeholder="000000"
                           maxLength="6"
+                          autoComplete="one-time-code"
                           required
                         />
                       </div>

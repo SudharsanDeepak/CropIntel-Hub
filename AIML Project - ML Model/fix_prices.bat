@@ -1,4 +1,9 @@
 @echo off
+setlocal
+
+set "SCRIPT_DIR=%~dp0"
+set "VENV_PY=%SCRIPT_DIR%..\.venv\Scripts\python.exe"
+
 echo.
 echo ========================================
 echo   FIX UNREALISTIC PRICES
@@ -14,7 +19,14 @@ echo.
 pause
 echo.
 echo Running fix script...
-python quick_populate_db.py
+if exist "%VENV_PY%" (
+	"%VENV_PY%" "%SCRIPT_DIR%quick_populate_db.py"
+) else (
+	echo [WARN] Virtual environment Python not found at:
+	echo        %VENV_PY%
+	echo [INFO] Falling back to system Python.
+	python "%SCRIPT_DIR%quick_populate_db.py"
+)
 echo.
 echo ========================================
 echo   DONE!

@@ -231,6 +231,8 @@ class MarketDataFetcher:
             print("⚠️  No records to save")
             return 0
         try:
+            # Delete old data before inserting new data to avoid duplication
+            self.collection.delete_many({})
             result = self.collection.insert_many(records)
             print(f"\n✅ Saved {len(result.inserted_ids)} records to MongoDB")
             return len(result.inserted_ids)

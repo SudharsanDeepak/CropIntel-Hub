@@ -283,6 +283,8 @@ class ComprehensiveMarketFetcher:
         
         if all_records:
             try:
+                # Delete old data before inserting new data to avoid duplication
+                self.collection.delete_many({})
                 result = self.collection.insert_many(all_records)
                 saved_count = len(result.inserted_ids)
                 

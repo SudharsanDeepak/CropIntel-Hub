@@ -8,6 +8,13 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
+from data_sources.mongodb_utils import replace_collection_with_batches
+from data_sources.price_catalog import (
+    deterministic_price,
+    deterministic_quantity,
+    deterministic_weather,
+    infer_category,
+)
 
 load_dotenv()
 
@@ -107,19 +114,18 @@ class FreeAPIFetcher:
         if isinstance(data, list) and len(data) > 1:
             for item in data[1][:10]:
                 if item.get('value'):
-                    base_price = float(item['value']) * 10
-                    
                     for product in ['Tomato', 'Potato', 'Onion', 'Apple', 'Banana']:
+                        weather = deterministic_weather(product)
                         records.append({
-                            "date": datetime.now() - timedelta(days=random.randint(0, 30)),
+                            "date": (datetime.now() - timedelta(days=random.randint(0, 30))).replace(hour=12, minute=0, second=0, microsecond=0),
                             "product": product,
-                            "category": "vegetable" if product in ['Tomato', 'Potato', 'Onion'] else "fruit",
-                            "quantity": random.uniform(80, 200),
-                            "price": base_price * random.uniform(0.8, 1.2),
+                            "category": infer_category(product),
+                            "quantity": deterministic_quantity(product, 0),
+                            "price": deterministic_price(product, 0, float(item['value']) * 10),
                             "unit": "kg",
-                            "stock": random.uniform(100, 300),
-                            "temperature": random.uniform(15, 35),
-                            "rainfall": random.uniform(0, 50),
+                            "stock": deterministic_quantity(product, 0),
+                            "temperature": weather["temperature"],
+                            "rainfall": weather["rainfall"],
                             "source": "world_bank_api",
                             "confidence": "high",
                             "seasonal": False
@@ -142,16 +148,17 @@ class FreeAPIFetcher:
                 product = product_map.get(str(item.get('Item Code', '')), 'Unknown')
                 
                 if product != 'Unknown':
+                    weather = deterministic_weather(product)
                     records.append({
-                        "date": datetime.now() - timedelta(days=random.randint(0, 30)),
+                        "date": (datetime.now() - timedelta(days=random.randint(0, 30))).replace(hour=12, minute=0, second=0, microsecond=0),
                         "product": product,
-                        "category": "vegetable",
+                        "category": infer_category(product),
                         "quantity": float(item.get('Value', 100)),
-                        "price": random.uniform(20, 60),
+                        "price": deterministic_price(product, 0),
                         "unit": "kg",
-                        "stock": random.uniform(100, 300),
-                        "temperature": random.uniform(15, 35),
-                        "rainfall": random.uniform(0, 50),
+                        "stock": deterministic_quantity(product, 0),
+                        "temperature": weather["temperature"],
+                        "rainfall": weather["rainfall"],
                         "source": "fao_api",
                         "confidence": "high",
                         "seasonal": False
@@ -167,19 +174,19 @@ class FreeAPIFetcher:
                    'Potato', 'Onion', 'Carrot', 'Cabbage', 'Cauliflower']
         
         for product in products:
-            category = "fruit" if product in ['Apple', 'Banana', 'Orange', 'Mango'] else "vegetable"
-            base_price = random.uniform(20, 100)
+            category = infer_category(product)
+            weather = deterministic_weather(product)
             
             records.append({
-                "date": datetime.now(),
+                "date": datetime.now().replace(hour=12, minute=0, second=0, microsecond=0),
                 "product": product,
                 "category": category,
-                "quantity": random.uniform(80, 200),
-                "price": base_price,
+                "quantity": deterministic_quantity(product, 0),
+                "price": deterministic_price(product, 0),
                 "unit": "kg",
-                "stock": random.uniform(100, 300),
-                "temperature": random.uniform(15, 35),
-                "rainfall": random.uniform(0, 50),
+                "stock": deterministic_quantity(product, 0),
+                "temperature": weather["temperature"],
+                "rainfall": weather["rainfall"],
                 "source": "commodity_api",
                 "confidence": "medium",
                 "seasonal": False
@@ -218,11 +225,9 @@ class FreeAPIFetcher:
             return 0
         
         try:
-            # Delete old data before inserting new data to avoid duplication
-            self.collection.delete_many({})
-            result = self.collection.insert_many(records)
-            print(f"✅ Saved {len(result.inserted_ids)} records to MongoDB")
-            return len(result.inserted_ids)
+            saved_count = replace_collection_with_batches(self.collection, records, batch_size=100)
+            print(f"✅ Saved {saved_count} records to MongoDB")
+            return saved_count
         except Exception as e:
             print(f"❌ Failed to save to MongoDB: {str(e)}")
             return 0

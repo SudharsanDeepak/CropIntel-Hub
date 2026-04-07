@@ -11,6 +11,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from pymongo import MongoClient
+from data_sources.mongodb_utils import replace_collection_with_batches
 
 SCRIPT_DIR = Path(__file__).resolve().parent
 if str(SCRIPT_DIR) not in sys.path:
@@ -300,9 +301,9 @@ def fix_database():
 
         print(f"✅ Created {len(records)} records for {len(canonical_products)} products")
 
-        print("\n💾 Inserting into MongoDB...")
-        result = collection.insert_many(records)
-        print(f"✅ Inserted {len(result.inserted_ids)} records")
+        print("\n💾 Inserting into MongoDB in batches...")
+        saved_count = replace_collection_with_batches(collection, records, batch_size=100)
+        print(f"✅ Inserted {saved_count} records")
 
         print("\n📊 VERIFICATION:")
         print("-" * 70)

@@ -4,6 +4,13 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
+from data_sources.mongodb_utils import replace_collection_with_batches
+from data_sources.price_catalog import (
+    deterministic_price,
+    deterministic_quantity,
+    deterministic_weather,
+    infer_category,
+)
 
 load_dotenv()
 
@@ -227,41 +234,27 @@ class AlternativeMarketDataFetcher:
             return []
         
         product_info = self.product_data[product_name]
-        price_range = product_info["price_range"]
-        category = product_info["category"]
         seasonal = product_info["seasonal"]
         
         records = []
-        volatility = self.fetch_cryptocompare_market_trends()
-        
-        trend = random.choice([-1, 0, 1])
         
         for day in range(days):
-            current_date = datetime.now() - timedelta(days=days-day)
-            
-            min_price, max_price = price_range
-            base_price = random.uniform(min_price, max_price)
-            
-            daily_change = random.uniform(-volatility, volatility)
-            trend_effect = trend * 0.02 * day
-            seasonal_effect = 0.1 * random.choice([-1, 1]) if seasonal else 0
-            
-            price = base_price * (1 + daily_change + trend_effect + seasonal_effect)
-            price = max(min_price, min(max_price, price))
-            
-            base_quantity = random.randint(80, 150)
-            quantity = base_quantity + random.randint(-20, 20)
+            current_date = (datetime.now() - timedelta(days=days - day)).replace(hour=12, minute=0, second=0, microsecond=0)
+            category = infer_category(product_name)
+            price = deterministic_price(product_name, day_offset=day)
+            quantity = deterministic_quantity(product_name, day_offset=day)
+            weather = deterministic_weather(product_name)
             
             records.append({
                 "date": current_date,
                 "product": product_name,
                 "category": category,
-                "quantity": round(quantity, 2),
-                "price": round(price, 2),
+                "quantity": quantity,
+                "price": price,
                 "unit": "kg",
                 "stock": round(quantity, 2),
-                "temperature": random.uniform(15, 35),
-                "rainfall": random.uniform(0, 50),
+                "temperature": weather["temperature"],
+                "rainfall": weather["rainfall"],
                 "source": "market_simulation",
                 "confidence": "high",
                 "seasonal": seasonal
@@ -296,11 +289,9 @@ class AlternativeMarketDataFetcher:
             return 0
         
         try:
-            # Delete old data before inserting new data to avoid duplication
-            self.collection.delete_many({})
-            result = self.collection.insert_many(records)
-            print(f"✅ Saved {len(result.inserted_ids)} records to MongoDB")
-            return len(result.inserted_ids)
+            saved_count = replace_collection_with_batches(self.collection, records, batch_size=100)
+            print(f"✅ Saved {saved_count} records to MongoDB")
+            return saved_count
         except Exception as e:
             print(f"❌ Failed to save to MongoDB: {str(e)}")
             return 0

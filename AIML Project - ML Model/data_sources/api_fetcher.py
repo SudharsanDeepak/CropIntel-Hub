@@ -8,6 +8,13 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
+from data_sources.mongodb_utils import replace_collection_with_batches
+from data_sources.price_catalog import (
+    deterministic_price,
+    deterministic_quantity,
+    deterministic_weather,
+    infer_category,
+)
 load_dotenv()
 class MarketDataFetcher:
     """
@@ -138,14 +145,17 @@ class MarketDataFetcher:
         records = []
         if "records" in data:
             for record in data["records"]:
+                product = record.get("commodity", "Unknown")
+                weather = deterministic_weather(product)
                 records.append({
                     "date": datetime.strptime(record.get("arrival_date", ""), "%Y-%m-%d"),
-                    "product": record.get("commodity", "Unknown"),
+                    "product": product,
+                    "category": infer_category(product),
                     "quantity": float(record.get("arrivals", 0)),
-                    "price": float(record.get("modal_price", 0)),
+                    "price": deterministic_price(product, 0, record.get("modal_price", 0)),
                     "stock": float(record.get("arrivals", 0)),
-                    "temperature": 0,  # Not available in API
-                    "rainfall": 0,  # Not available in API
+                    "temperature": weather["temperature"],
+                    "rainfall": weather["rainfall"],
                     "source": "agmarknet"
                 })
         return records
@@ -155,14 +165,16 @@ class MarketDataFetcher:
         if "results" in data:
             for item in data["results"]:
                 try:
+                    weather = deterministic_weather(commodity)
                     records.append({
-                        "date": datetime.now(),
+                        "date": datetime.now().replace(hour=12, minute=0, second=0, microsecond=0),
                         "product": commodity,
-                        "quantity": 100,
-                        "price": self._extract_price_from_text(item.get("report_text", "")),
-                        "stock": 100,
-                        "temperature": 0,
-                        "rainfall": 0,
+                        "category": infer_category(commodity),
+                        "quantity": deterministic_quantity(commodity, 0),
+                        "price": deterministic_price(commodity, 0, self._extract_price_from_text(item.get("report_text", ""))),
+                        "stock": deterministic_quantity(commodity, 0),
+                        "temperature": weather["temperature"],
+                        "rainfall": weather["rainfall"],
                         "source": "usda"
                     })
                 except:
@@ -179,14 +191,16 @@ class MarketDataFetcher:
                     avg_price += float(item["price"])
                     count += 1
             if count > 0:
+                weather = deterministic_weather(product)
                 records.append({
-                    "date": datetime.now(),
+                    "date": datetime.now().replace(hour=12, minute=0, second=0, microsecond=0),
                     "product": product,
-                    "quantity": 100,
-                    "price": avg_price / count,
-                    "stock": 100,
-                    "temperature": 0,
-                    "rainfall": 0,
+                    "category": infer_category(product),
+                    "quantity": deterministic_quantity(product, 0),
+                    "price": deterministic_price(product, 0, avg_price / count),
+                    "stock": deterministic_quantity(product, 0),
+                    "temperature": weather["temperature"],
+                    "rainfall": weather["rainfall"],
                     "source": "openfoodfacts"
                 })
         return records
@@ -231,11 +245,9 @@ class MarketDataFetcher:
             print("⚠️  No records to save")
             return 0
         try:
-            # Delete old data before inserting new data to avoid duplication
-            self.collection.delete_many({})
-            result = self.collection.insert_many(records)
-            print(f"\n✅ Saved {len(result.inserted_ids)} records to MongoDB")
-            return len(result.inserted_ids)
+            saved_count = replace_collection_with_batches(self.collection, records, batch_size=100)
+            print(f"\n✅ Saved {saved_count} records to MongoDB")
+            return saved_count
         except Exception as e:
             print(f"❌ Failed to save to MongoDB: {str(e)}")
             return 0

@@ -8,6 +8,13 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
+from data_sources.mongodb_utils import replace_collection_with_batches
+from data_sources.price_catalog import (
+    deterministic_price,
+    deterministic_quantity,
+    deterministic_weather,
+    infer_category,
+)
 
 load_dotenv()
 
@@ -151,31 +158,21 @@ class ComprehensiveMarketFetcher:
         if self.current_weather is None:
             self.current_weather = self.weather_fetcher.fetch_average_weather()
         
-        category = "fruit" if commodity in ["Apple", "Banana", "Orange", "Mango", "Grape", 
-                                            "Strawberry", "Watermelon", "Pineapple", "Papaya", 
-                                            "Guava", "Pomegranate", "Kiwi", "Lemon", "Lime", 
-                                            "Peach", "Plum", "Cherry", "Apricot", "Pear", 
-                                            "Lychee", "Dragon Fruit", "Passion Fruit", "Avocado", 
-                                            "Coconut", "Dates", "Fig", "Jackfruit", "Custard Apple", 
-                                            "Sapota", "Mulberry"] else "vegetable"
-        
-        base_price = random.uniform(20, 150)
-        base_quantity = random.uniform(100, 500)
-        
         for day in range(days):
-            date = datetime.now() - timedelta(days=day)
-            
-            price_variation = random.uniform(0.85, 1.15)
-            quantity_variation = random.uniform(0.80, 1.20)
+            date = (datetime.now() - timedelta(days=day)).replace(hour=12, minute=0, second=0, microsecond=0)
+            category = infer_category(commodity)
+            price = deterministic_price(commodity, day_offset=day)
+            quantity = deterministic_quantity(commodity, day_offset=day)
+            weather = deterministic_weather(commodity)
             
             records.append({
                 "date": date,
                 "product": commodity,
                 "category": category,
-                "quantity": round(base_quantity * quantity_variation, 2),
-                "price": round(base_price * price_variation, 2),
+                "quantity": quantity,
+                "price": price,
                 "unit": "kg",
-                "stock": round(base_quantity * quantity_variation * 1.5, 2),
+                "stock": round(quantity * 1.5, 2),
                 "temperature": self.current_weather["temperature"],
                 "rainfall": self.current_weather["rainfall"],
                 "source": "realistic_simulation",
@@ -190,16 +187,18 @@ class ComprehensiveMarketFetcher:
         records = []
         for record in data.get("records", [])[:7]:
             try:
+                price = deterministic_price(commodity, 0, record.get("modal_price", 50))
+                quantity = float(record.get("arrivals", 100))
                 records.append({
-                    "date": datetime.now(),
+                    "date": datetime.now().replace(hour=12, minute=0, second=0, microsecond=0),
                     "product": commodity,
-                    "category": "vegetable",
-                    "quantity": float(record.get("arrivals", 100)),
-                    "price": float(record.get("modal_price", 50)),
+                    "category": infer_category(commodity),
+                    "quantity": quantity,
+                    "price": price,
                     "unit": "kg",
-                    "stock": float(record.get("arrivals", 100)) * 1.5,
-                    "temperature": random.uniform(20, 30),
-                    "rainfall": random.uniform(0, 30),
+                    "stock": quantity * 1.5,
+                    "temperature": deterministic_weather(commodity)["temperature"],
+                    "rainfall": deterministic_weather(commodity)["rainfall"],
                     "source": "agmarknet_api",
                     "confidence": "high",
                     "seasonal": False
@@ -213,16 +212,17 @@ class ComprehensiveMarketFetcher:
         records = []
         for item in data.get("results", [])[:7]:
             try:
+                weather = deterministic_weather(commodity)
                 records.append({
-                    "date": datetime.now(),
+                    "date": datetime.now().replace(hour=12, minute=0, second=0, microsecond=0),
                     "product": commodity,
-                    "category": "fruit",
-                    "quantity": random.uniform(100, 300),
-                    "price": random.uniform(30, 100),
+                    "category": infer_category(commodity),
+                    "quantity": deterministic_quantity(commodity, 0),
+                    "price": deterministic_price(commodity, 0),
                     "unit": "kg",
-                    "stock": random.uniform(150, 400),
-                    "temperature": random.uniform(20, 30),
-                    "rainfall": random.uniform(0, 30),
+                    "stock": deterministic_quantity(commodity, 0) * 1.5,
+                    "temperature": weather["temperature"],
+                    "rainfall": weather["rainfall"],
                     "source": "usda_api",
                     "confidence": "high",
                     "seasonal": False
@@ -283,10 +283,7 @@ class ComprehensiveMarketFetcher:
         
         if all_records:
             try:
-                # Delete old data before inserting new data to avoid duplication
-                self.collection.delete_many({})
-                result = self.collection.insert_many(all_records)
-                saved_count = len(result.inserted_ids)
+                saved_count = replace_collection_with_batches(self.collection, all_records, batch_size=100)
                 
                 print("\n" + "=" * 70)
                 print(f"✅ DATA UPDATE COMPLETE")

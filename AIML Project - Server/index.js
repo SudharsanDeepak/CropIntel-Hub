@@ -9,6 +9,7 @@ const Sales = require("./models/Sales");
 const app = express();
 const PORT = process.env.PORT || 5000;
 const ML_API = process.env.ML_API_URL || "http://localhost:8000"
+const ADMIN_API_KEY = process.env.ADMIN_API_KEY || "cropintelhub_admin";
 
 const UPSTREAM_CACHE_TTL_MS = 10 * 60 * 1000;
 const upstreamCache = new Map();
@@ -557,9 +558,18 @@ app.get("/api/elasticity", async (req, res) => {
 });
 app.post("/api/data/update", async (req, res) => {
   try {
-    const response = await axios.post(`${ML_API}/data/update`, {}, {
-      timeout: 180000, 
+    const response = await axios.get(`${ML_API}/data/update`, {
+      timeout: 180000,
+      headers: {
+        "X-API-Key": ADMIN_API_KEY,
+      },
     });
+
+    // Bust all upstream caches so clients see fresh prices immediately.
+    upstreamCache.clear();
+    inFlightUpstreamRequests.clear();
+    upstreamThrottleUntil.clear();
+
     res.json(response.data);
   } catch (error) {
     console.error("Data Update Error:", error.message);

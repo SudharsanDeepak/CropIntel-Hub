@@ -3,6 +3,7 @@ import axios from 'axios'
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const CACHE_PREFIX = 'cropintel_cache_v1:'
 const RATE_LIMIT_PREFIX = 'cropintel_rate_limit_v1:'
+const CACHE_TTL_MS = 2 * 60 * 1000
 const inFlightRequests = new Map()
 
 const api = axios.create({
@@ -41,6 +42,11 @@ const getCachedValue = (key) => {
     const raw = localStorage.getItem(`${CACHE_PREFIX}${key}`)
     if (!raw) return null
     const parsed = JSON.parse(raw)
+    const age = Date.now() - (parsed?.timestamp || 0)
+    if (!parsed?.timestamp || age > CACHE_TTL_MS) {
+      localStorage.removeItem(`${CACHE_PREFIX}${key}`)
+      return null
+    }
     return parsed?.value ?? null
   } catch {
     return null
@@ -58,6 +64,24 @@ const setCachedValue = (key, value) => {
     )
   } catch {
     // Ignore storage quota or serialization errors.
+  }
+}
+
+const clearCachedValues = (predicate = () => true) => {
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const storageKey = localStorage.key(i)
+      if (!storageKey || !storageKey.startsWith(CACHE_PREFIX)) {
+        continue
+      }
+
+      const logicalKey = storageKey.slice(CACHE_PREFIX.length)
+      if (predicate(logicalKey)) {
+        localStorage.removeItem(storageKey)
+      }
+    }
+  } catch {
+    // Ignore storage access failures.
   }
 }
 
@@ -222,7 +246,10 @@ export const marketAPI = {
       timeout: 30000,
       fallbackValue: [],
     }),
-  updateMarketData: () => 
-    api.post('/api/data/update', {}, { timeout: 180000 }), 
+  updateMarketData: async () => {
+    const result = await api.post('/api/data/update', {}, { timeout: 180000 })
+    clearCachedValues((key) => key.startsWith('products:'))
+    return result
+  },
 }
 export default api

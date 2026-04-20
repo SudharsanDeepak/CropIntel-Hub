@@ -1,6 +1,7 @@
 """Canonical product price and category helpers for market data generation."""
 
 import random
+from datetime import datetime
 
 PRODUCT_PRICE_RANGES = {
     "Apple": (140, 220),
@@ -266,7 +267,7 @@ def infer_price_range(product_name):
     return (40, 120) if infer_category(product_name) == "vegetable" else (70, 180)
 
 
-def deterministic_price(product_name, day_offset=0, observed_price=None):
+def deterministic_price(product_name, day_offset=0, observed_price=None, date_seed=None):
     min_price, max_price = infer_price_range(product_name)
     midpoint = (min_price + max_price) / 2
 
@@ -278,12 +279,20 @@ def deterministic_price(product_name, day_offset=0, observed_price=None):
         except Exception:
             pass
 
-    rng = random.Random(f"{product_name}:{day_offset}")
-    return round(midpoint * rng.uniform(0.95, 1.05), 2)
+    if date_seed is None:
+        date_seed = datetime.utcnow().strftime("%Y-%m-%d")
+
+    rng = random.Random(f"{product_name}:{date_seed}:{day_offset}")
+    price = midpoint * rng.uniform(0.95, 1.05)
+    price = max(min_price, min(max_price, price))
+    return round(price, 2)
 
 
-def deterministic_quantity(product_name, day_offset=0):
-    rng = random.Random(f"{product_name}:quantity:{day_offset}")
+def deterministic_quantity(product_name, day_offset=0, date_seed=None):
+    if date_seed is None:
+        date_seed = datetime.utcnow().strftime("%Y-%m-%d")
+
+    rng = random.Random(f"{product_name}:quantity:{date_seed}:{day_offset}")
     return round(rng.uniform(90, 360), 1)
 
 

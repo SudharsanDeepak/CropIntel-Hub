@@ -7,21 +7,21 @@ import time
 from datetime import datetime
 import os
 from dotenv import load_dotenv
-from data_sources.api_fetcher import MarketDataFetcher
+from data_sources.comprehensive_market_fetcher import ComprehensiveMarketFetcher
 load_dotenv()
 class DataUpdateScheduler:
     """
     Schedules automatic data updates at specified intervals.
     """
     def __init__(self):
-        self.fetcher = MarketDataFetcher()
+        self.fetcher = ComprehensiveMarketFetcher()
         self.update_interval = float(os.getenv("DATA_UPDATE_INTERVAL", 24))
     def update_job(self):
         """
         Job to run on schedule.
         """
         print(f"\n⏰ Scheduled update triggered at {datetime.now()}")
-        self.fetcher.update_market_data()
+        self.fetcher.update_all_products(days=7)
     def start(self):
         """
         Start the scheduler.

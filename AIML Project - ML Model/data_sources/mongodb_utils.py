@@ -41,22 +41,48 @@ def sanitize_market_record(record):
     return sanitized
 
 
-def replace_collection_with_batches(collection, records, batch_size=100, delete_filter=None, retries=3):
+def replace_collection_with_batches(
+    collection,
+    records,
+    batch_size=100,
+    delete_filter=None,
+    retries=3,
+    preserve_missing_products=True,
+    product_field="product",
+):
     """
-    Replace a collection by deleting matching documents and inserting records in batches.
+    Replace matching records by deleting only incoming products and inserting in batches.
+
+    When preserve_missing_products=True, products that are not present in incoming
+    records are left untouched in MongoDB.
 
     This keeps large refresh jobs from timing out on Atlas connections.
     """
     if not records:
         return 0
 
-    collection.delete_many(delete_filter or {})
+    sanitized_records = [sanitize_market_record(item) for item in records]
+
+    if delete_filter is not None:
+        collection.delete_many(delete_filter)
+    elif preserve_missing_products:
+        products_to_replace = sorted(
+            {
+                str(item.get(product_field, "")).strip()
+                for item in sanitized_records
+                if str(item.get(product_field, "")).strip()
+            }
+        )
+        if products_to_replace:
+            collection.delete_many({product_field: {"$in": products_to_replace}})
+    else:
+        collection.delete_many({})
 
     saved_count = 0
     total_records = len(records)
 
     for start in range(0, total_records, batch_size):
-        batch = [sanitize_market_record(item) for item in records[start:start + batch_size]]
+        batch = sanitized_records[start:start + batch_size]
         last_error = None
 
         for attempt in range(retries):

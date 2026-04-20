@@ -29,20 +29,24 @@ def main():
     except Exception as e:
         print(f"❌ Comprehensive fetch failed: {str(e)}\n")
     
-    # Step 2: Try Blinkit for Indian market prices (if available)
-    print("🛒 Step 2: Attempting Blinkit API for real Indian market prices...")
-    print("-" * 80)
-    try:
-        from data_sources.blinkit_api_fetcher import BlinkitAPIFetcher
-        blinkit = BlinkitAPIFetcher()
-        products = blinkit.fetch_all_fruits_vegetables()
-        if products:
-            saved = blinkit.save_to_mongodb(products)
-            print(f"✅ Blinkit fetch complete: {saved} products saved\n")
-        else:
-            print("⚠️  Blinkit API returned no data (may require setup)\n")
-    except Exception as e:
-        print(f"⚠️  Blinkit fetch skipped: {str(e)}\n")
+    # Step 2: Optional Blinkit import (disabled by default for safety)
+    blinkit_enabled = os.getenv("BLINKIT_IMPORT_ENABLED", "false").lower() == "true"
+    if blinkit_enabled:
+        print("🛒 Step 2: Attempting Blinkit API for real Indian market prices...")
+        print("-" * 80)
+        try:
+            from data_sources.blinkit_api_fetcher import BlinkitAPIFetcher
+            blinkit = BlinkitAPIFetcher()
+            products = blinkit.fetch_all_fruits_vegetables()
+            if products:
+                saved = blinkit.save_to_mongodb(products)
+                print(f"✅ Blinkit fetch complete: {saved} products saved\n")
+            else:
+                print("⚠️  Blinkit API returned no data (may require setup)\n")
+        except Exception as e:
+            print(f"⚠️  Blinkit fetch skipped: {str(e)}\n")
+    else:
+        print("🛒 Step 2: Blinkit import disabled (BLINKIT_IMPORT_ENABLED=false)\n")
     
     # Step 3: Update weather data
     print("🌤️  Step 3: Updating weather data...")

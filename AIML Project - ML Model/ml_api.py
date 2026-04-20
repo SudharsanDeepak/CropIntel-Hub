@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 from datetime import datetime, timedelta
 import threading
 import time
+from data_sources.mongodb_utils import sanitize_market_record
 load_dotenv()
 app = FastAPI(title="Market Intelligence ML API")
 app.add_middleware(
@@ -177,14 +178,15 @@ def get_latest_products(
         
         products = []
         for item in results:
+            safe_item = sanitize_market_record(item)
             products.append({
-                "product": item["product"],
-                "category": item.get("category", "fruit"),
-                "price": float(item["price"]),
-                "predicted_demand": float(item.get("quantity", 100)),
-                "stock": int(item.get("stock", 100)),
-                "date": item["date"].isoformat() if isinstance(item["date"], datetime) else str(item["date"]),
-                "source": item.get("source", "database")
+                "product": safe_item["product"],
+                "category": safe_item.get("category", "fruit"),
+                "price": float(safe_item["price"]),
+                "predicted_demand": float(safe_item.get("quantity", 100)),
+                "stock": int(safe_item.get("stock", 100)),
+                "date": safe_item["date"].isoformat() if isinstance(safe_item["date"], datetime) else str(safe_item["date"]),
+                "source": safe_item.get("source", "database")
             })
         
         return products

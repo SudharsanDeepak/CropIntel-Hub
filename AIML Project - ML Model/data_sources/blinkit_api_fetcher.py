@@ -10,6 +10,7 @@ from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
 import time
+from data_sources.mongodb_utils import replace_collection_with_batches
 load_dotenv()
 class BlinkitAPIFetcher:
     """
@@ -165,9 +166,14 @@ class BlinkitAPIFetcher:
             print("⚠️  No products to save")
             return 0
         try:
-            result = self.collection.insert_many(products)
-            print(f"\n✅ Saved {len(result.inserted_ids)} products to MongoDB")
-            return len(result.inserted_ids)
+            saved_count = replace_collection_with_batches(
+                self.collection,
+                products,
+                batch_size=100,
+                preserve_missing_products=True,
+            )
+            print(f"\n✅ Saved {saved_count} products to MongoDB")
+            return saved_count
         except Exception as e:
             print(f"❌ MongoDB save error: {str(e)}")
             return 0

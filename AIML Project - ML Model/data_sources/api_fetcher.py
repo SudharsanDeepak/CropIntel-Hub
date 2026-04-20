@@ -3,7 +3,6 @@ Real-time market data fetcher for vegetables and fruits.
 Integrates with multiple data sources and stores in MongoDB.
 """
 import requests
-import pandas as pd
 from datetime import datetime, timedelta
 from pymongo import MongoClient
 import os
@@ -142,13 +141,25 @@ class MarketDataFetcher:
             return None
     def _parse_agmarknet_response(self, data):
         """Parse Agmarknet API response"""
+        def parse_agmarknet_date(raw_date):
+            if not raw_date:
+                return datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+
+            for fmt in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y"):
+                try:
+                    return datetime.strptime(str(raw_date), fmt)
+                except ValueError:
+                    continue
+
+            return datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+
         records = []
         if "records" in data:
             for record in data["records"]:
                 product = record.get("commodity", "Unknown")
                 weather = deterministic_weather(product)
                 records.append({
-                    "date": datetime.strptime(record.get("arrival_date", ""), "%Y-%m-%d"),
+                    "date": parse_agmarknet_date(record.get("arrival_date", "")),
                     "product": product,
                     "category": infer_category(product),
                     "quantity": float(record.get("arrivals", 0)),

@@ -34,7 +34,7 @@ const Compare = () => {
   const fetchForecast = async (productName) => {
     try {
       const data = await marketAPI.getProductForecast(productName, 7)
-      return data
+      return Array.isArray(data) ? data : []
     } catch (error) {
       console.error('Error fetching forecast:', error)
       return []

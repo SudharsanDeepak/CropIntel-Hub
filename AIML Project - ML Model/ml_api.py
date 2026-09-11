@@ -25,6 +25,7 @@ collection = db["sales"]
 # Create indexes for better query performance
 try:
     collection.create_index([("product", 1), ("date", -1)])
+    collection.create_index([("district", 1), ("product", 1), ("date", -1)])
     collection.create_index([("category", 1), ("date", -1)])
     collection.create_index([("date", -1)])
     print("✅ MongoDB indexes created successfully")
@@ -135,7 +136,8 @@ def health_check():
 def get_latest_products(
     limit: Optional[int] = Query(None, description="Limit number of products"),
     category: Optional[str] = Query(None, description="Filter by category: fruit or vegetable"),
-    search: Optional[str] = Query(None, description="Search by product name")
+    search: Optional[str] = Query(None, description="Search by product name"),
+    district: Optional[str] = Query(None, description="Tamil Nadu district")
 ):
     """
     Fast endpoint to get latest prices for all products.
@@ -149,6 +151,8 @@ def get_latest_products(
         match_stage = {}
         if category:
             match_stage["category"] = category
+        if district:
+            match_stage["district"] = district
         if search:
             match_stage["product"] = {"$regex": search, "$options": "i"}
         
@@ -160,14 +164,19 @@ def get_latest_products(
             {"$sort": {"date": -1}},
             {
                 "$group": {
-                    "_id": "$product",
+                    "_id": {"product": "$product", "district": "$district"} if district else "$product",
                     "product": {"$first": "$product"},
                     "category": {"$first": "$category"},
                     "price": {"$first": "$price"},
                     "quantity": {"$first": "$quantity"},
+                    "avg_quantity": {"$avg": "$quantity"},
                     "stock": {"$first": "$stock"},
                     "date": {"$first": "$date"},
-                    "source": {"$first": "$source"}
+                    "source": {"$first": "$source"},
+                    "district": {"$first": "$district"},
+                    "market": {"$first": "$market"},
+                    "min_price": {"$first": "$min_price"},
+                    "max_price": {"$first": "$max_price"}
                 }
             },
             {"$limit": limit if limit else 200}  # Default limit to prevent huge responses
@@ -175,38 +184,119 @@ def get_latest_products(
         
         # Execute with timeout
         results = list(collection.aggregate(pipeline, maxTimeMS=25000))  # 25 second timeout
+
+        # Government feeds do not report every commodity in every district on
+        # every day. Fill only missing district/product combinations from the
+        # latest Tamil Nadu record and mark those values as references.
+        if district and not limit:
+            fallback_pipeline = []
+            fallback_match = {}
+            if category:
+                fallback_match["category"] = category
+            if search:
+                fallback_match["product"] = {"$regex": search, "$options": "i"}
+            if fallback_match:
+                fallback_pipeline.append({"$match": fallback_match})
+            fallback_pipeline.extend([
+                {"$sort": {"date": -1}},
+                {
+                    "$group": {
+                        "_id": "$product",
+                        "product": {"$first": "$product"},
+                        "category": {"$first": "$category"},
+                        "price": {"$first": "$price"},
+                        "quantity": {"$first": "$quantity"},
+                        "avg_quantity": {"$avg": "$quantity"},
+                        "stock": {"$first": "$stock"},
+                        "date": {"$first": "$date"},
+                        "source": {"$first": "$source"},
+                        "market": {"$first": "$market"},
+                        "min_price": {"$first": "$min_price"},
+                        "max_price": {"$first": "$max_price"}
+                    }
+                }
+            ])
+            fallback_results = list(collection.aggregate(fallback_pipeline, maxTimeMS=25000))
+            exact_products = {item.get("product") for item in results}
+            results.extend(
+                {
+                    **item,
+                    "district": district,
+                    "market": None,
+                    "source": "statewide_reference",
+                    "price_scope": "tamil_nadu_statewide",
+                    "price_available": False
+                }
+                for item in fallback_results
+                if item.get("product") not in exact_products
+            )
         
         products = []
         for item in results:
             safe_item = sanitize_market_record(item)
+            demand_quantity = safe_item.get("avg_quantity") or safe_item.get("quantity")
+            is_statewide_reference = safe_item.get("source") == "statewide_reference"
+            is_market_arrival = safe_item.get("source") == "agmarknet_government"
+            demand_available = is_market_arrival and demand_quantity is not None and float(demand_quantity) > 0
             products.append({
                 "product": safe_item["product"],
                 "category": safe_item.get("category", "fruit"),
                 "price": float(safe_item["price"]),
-                "predicted_demand": float(safe_item.get("quantity", 100)),
+                "predicted_demand": round(float(demand_quantity), 1) if demand_available else 0,
+                "demand_unit": "market arrivals (kg)" if demand_available else "unavailable",
+                "demand_source": "Agmarknet market arrivals" if demand_available else "No verified daily arrivals reported",
+                "demand_location": "Tamil Nadu statewide reference" if is_statewide_reference else safe_item.get("district"),
+                "demand_available": demand_available and not is_statewide_reference,
                 "stock": int(safe_item.get("stock", 100)),
                 "date": safe_item["date"].isoformat() if isinstance(safe_item["date"], datetime) else str(safe_item["date"]),
-                "source": safe_item.get("source", "database")
+                "source": safe_item.get("source", "database"),
+                "district": safe_item.get("district"),
+                "market": safe_item.get("market"),
+                "min_price": float(safe_item.get("min_price") or safe_item["price"]),
+                "max_price": float(safe_item.get("max_price") or safe_item["price"])
+                ,"price_scope": safe_item.get("price_scope", "district")
+                ,"price_available": safe_item.get("price_available", True)
             })
         
         return products
     except Exception as e:
         print(f"❌ Error in /products/latest: {str(e)}")
         return {"error": str(e), "products": []}
+
+@app.get("/districts")
+def get_districts():
+    """Return districts currently represented by government market records."""
+    try:
+        return list(collection.distinct("district", {"district": {"$nin": [None, "", "Unknown"]}}))
+    except Exception as e:
+        return {"error": str(e), "districts": []}
 @app.get("/products/{product_name}/forecast")
-def get_product_forecast(product_name: str, days: int = 7):
+def get_product_forecast(product_name: str, days: int = 7, district: Optional[str] = None):
     """
     Fast endpoint to get forecast for a specific product.
     Only processes one product at a time.
     """
     try:
-        historical = list(collection.find(
-            {"product": product_name}
-        ).sort("date", -1).limit(30))
+        match = {"product": product_name}
+        if district:
+            match["district"] = district
+        historical = list(collection.find(match).sort("date", -1).limit(30))
+        if not historical and district:
+            match = {"product": product_name}
+            historical = list(collection.find(match).sort("date", -1).limit(30))
         if not historical:
             return {"error": "Product not found", "forecasts": []}
         price_pipeline = [
-            {"$match": {"product": product_name}},
+            {"$match": match},
+            {"$sort": {"date": -1}},
+            {
+                "$group": {
+                    "_id": {"$dateToString": {"format": "%Y-%m-%d", "date": "$date"}},
+                    "date": {"$first": "$date"},
+                    "price": {"$avg": "$price"},
+                    "quantity": {"$avg": "$quantity"}
+                }
+            },
             {"$sort": {"date": -1}},
             {"$limit": days}
         ]
@@ -215,20 +305,23 @@ def get_product_forecast(product_name: str, days: int = 7):
         for item in price_data:
             forecasts.append({
                 "date": item["date"].isoformat() if isinstance(item["date"], datetime) else str(item["date"]),
-                "predicted_price": float(item["price"]),
-                "predicted_demand": float(item.get("quantity", 100)),
+                "predicted_price": round(float(item["price"]), 2),
+                "predicted_demand": round(float(item.get("quantity") or 0), 1),
                 "product": product_name
             })
         return forecasts
     except Exception as e:
         return {"error": str(e), "forecasts": []}
 @app.get("/forecast/demand")
-def demand(days: int = 7):
+def demand(days: int = 7, district: Optional[str] = None):
     """
     Get demand forecast using simple moving average from historical data.
     """
     try:
-        pipeline = [
+        pipeline = []
+        if district:
+            pipeline.append({"$match": {"district": district}})
+        pipeline.extend([
             {"$sort": {"date": -1}},
             {"$limit": days * 50},
             {
@@ -239,7 +332,7 @@ def demand(days: int = 7):
                     "category": {"$first": "$category"}
                 }
             }
-        ]
+        ])
         
         results = list(collection.aggregate(pipeline))
         
@@ -257,12 +350,15 @@ def demand(days: int = 7):
         print(f"Demand forecast error: {str(e)}")
         return []
 @app.get("/forecast/price")
-def price(days: int = 7):
+def price(days: int = 7, district: Optional[str] = None):
     """
     Get price forecast using simple moving average from historical data.
     """
     try:
-        pipeline = [
+        pipeline = []
+        if district:
+            pipeline.append({"$match": {"district": district}})
+        pipeline.extend([
             {"$sort": {"date": -1}},
             {"$limit": days * 50},
             {
@@ -273,7 +369,7 @@ def price(days: int = 7):
                     "category": {"$first": "$category"}
                 }
             }
-        ]
+        ])
         
         results = list(collection.aggregate(pipeline))
         
@@ -291,12 +387,15 @@ def price(days: int = 7):
         print(f"Price forecast error: {str(e)}")
         return []
 @app.get("/analysis/stock")
-def stock(days: int = 7):
+def stock(days: int = 7, district: Optional[str] = None):
     """
     Get stock optimization recommendations based on average demand.
     """
     try:
-        pipeline = [
+        pipeline = []
+        if district:
+            pipeline.append({"$match": {"district": district}})
+        pipeline.extend([
             {"$sort": {"date": -1}},
             {"$limit": days * 50},
             {
@@ -308,7 +407,7 @@ def stock(days: int = 7):
                     "category": {"$first": "$category"}
                 }
             }
-        ]
+        ])
         
         results = list(collection.aggregate(pipeline))
         
@@ -327,12 +426,15 @@ def stock(days: int = 7):
         print(f"Stock optimization error: {str(e)}")
         return []
 @app.get("/analysis/elasticity")
-def elasticity():
+def elasticity(district: Optional[str] = None):
     """
     Get price elasticity analysis based on price-quantity correlation.
     """
     try:
-        pipeline = [
+        pipeline = []
+        if district:
+            pipeline.append({"$match": {"district": district}})
+        pipeline.extend([
             {"$sort": {"date": -1}},
             {"$limit": 1000},
             {
@@ -344,7 +446,7 @@ def elasticity():
                     "category": {"$first": "$category"}
                 }
             }
-        ]
+        ])
         
         results = list(collection.aggregate(pipeline))
         

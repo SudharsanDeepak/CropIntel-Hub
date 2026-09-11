@@ -1,6 +1,7 @@
 """MongoDB write helpers for bulk refresh jobs."""
 
 import time
+from pymongo import UpdateOne
 from data_sources.price_catalog import infer_category, infer_price_range
 
 
@@ -23,13 +24,14 @@ def sanitize_market_record(record):
     midpoint = (min_price + max_price) / 2
 
     price = _to_float(sanitized.get("price", midpoint), midpoint)
-    if price < min_price or price > max_price:
+    source = str(sanitized.get("source", ""))
+    if source in {"realistic_simulation", "fallback_simulation"} and (price < min_price or price > max_price):
         price = midpoint
     sanitized["price"] = round(price, 2)
 
     if "predicted_price" in sanitized:
         predicted_price = _to_float(sanitized.get("predicted_price", sanitized["price"]), sanitized["price"])
-        if predicted_price < min_price or predicted_price > max_price:
+        if source in {"realistic_simulation", "fallback_simulation"} and (predicted_price < min_price or predicted_price > max_price):
             predicted_price = sanitized["price"]
         sanitized["predicted_price"] = round(predicted_price, 2)
 
@@ -100,3 +102,40 @@ def replace_collection_with_batches(
             raise last_error
 
     return saved_count
+
+
+def upsert_market_history_with_batches(collection, records, batch_size=100, retries=3):
+    """Upsert market records while retaining prior daily history."""
+    if not records:
+        return 0
+
+    sanitized_records = [sanitize_market_record(item) for item in records]
+    operations = []
+    for record in sanitized_records:
+        identity = {
+            "product": record.get("product"),
+            "district": record.get("district"),
+            "market": record.get("market"),
+            "date": record.get("date"),
+            "source": record.get("source"),
+        }
+        operations.append(UpdateOne(identity, {"$set": record}, upsert=True))
+
+    updated_count = 0
+    for start in range(0, len(operations), batch_size):
+        batch = operations[start:start + batch_size]
+        last_error = None
+        for attempt in range(retries):
+            try:
+                result = collection.bulk_write(batch, ordered=False)
+                updated_count += result.upserted_count + result.modified_count
+                last_error = None
+                break
+            except Exception as error:
+                last_error = error
+                if attempt < retries - 1:
+                    time.sleep(1 + attempt)
+        if last_error is not None:
+            raise last_error
+
+    return updated_count

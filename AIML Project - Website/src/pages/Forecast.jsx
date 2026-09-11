@@ -3,6 +3,7 @@ import { Calendar, TrendingUp, Package, DollarSign, BarChart3, Filter, RefreshCw
 import { useState, useEffect, useMemo } from 'react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { marketAPI } from '../services/api'
+import { useSelectedDistrict } from '../hooks/useSelectedDistrict'
 
 const Forecast = () => {
   const [products, setProducts] = useState([])
@@ -11,13 +12,14 @@ const Forecast = () => {
   const [forecastData, setForecastData] = useState([])
   const [forecastLoading, setForecastLoading] = useState(false)
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [selectedDistrict] = useSelectedDistrict()
   useEffect(() => {
     fetchProducts()
-  }, [])
+  }, [selectedDistrict])
   const fetchProducts = async () => {
     try {
       setIsLoading(true)
-      const data = await marketAPI.getLatestProducts()
+      const data = await marketAPI.getLatestProducts({ district: selectedDistrict })
       setProducts(data)
       if (data.length > 0) {
         setSelectedProduct(data[0].product)
@@ -33,8 +35,8 @@ const Forecast = () => {
   const fetchForecast = async (productName) => {
     try {
       setForecastLoading(true)
-      const data = await marketAPI.getProductForecast(productName, 7)
-      const formattedData = data.map(item => ({
+      const data = await marketAPI.getProductForecast(productName, 7, selectedDistrict)
+      const formattedData = (Array.isArray(data) ? data : []).map(item => ({
         date: new Date(item.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
         price: parseFloat(item.predicted_price.toFixed(2)),
         demand: parseFloat(item.predicted_demand.toFixed(1)),

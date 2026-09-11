@@ -2,6 +2,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { MessageCircle, X, Send, Bot, User, TrendingUp, DollarSign, Package, Calendar } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { marketAPI } from '../services/api'
+import { getSelectedDistrict } from '../hooks/useSelectedDistrict'
 import { matchProducts } from '../utils/productMatcher'
 import { parseQuery } from '../utils/queryParser'
 import { ConversationManager } from '../utils/conversationManager'
@@ -59,7 +60,7 @@ const MarketGuide = () => {
     isFetchingProductsRef.current = true
 
     try {
-      const response = await marketAPI.getLatestProducts()
+      const response = await marketAPI.getLatestProducts({ district: getSelectedDistrict() })
       if (isMountedRef.current) {
         setProducts(Array.isArray(response) ? response : [])
       }

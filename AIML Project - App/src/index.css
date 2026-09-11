@@ -15,11 +15,20 @@
     overflow-x: hidden;
     min-height: 100vh;
     min-height: -webkit-fill-available;
+    width: 100%;
   }
   
   #root {
     min-height: 100vh;
     min-height: -webkit-fill-available;
+    width: 100%;
+    min-width: 0;
+  }
+
+  html {
+    width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
   }
   
   h1, h2, h3, h4, h5, h6 {
@@ -142,6 +151,14 @@
   html {
     font-size: 14px;
   }
+
+  .card {
+    @apply p-4;
+  }
+
+  .input-field {
+    @apply min-h-11;
+  }
 }
 @media (min-width: 641px) and (max-width: 1024px) {
   html {
@@ -151,5 +168,16 @@
 @media (min-width: 1025px) {
   html {
     font-size: 16px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .app-main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .app-sidebar {
+    width: min(14rem, calc(100vw - 3rem)) !important;
   }
 }

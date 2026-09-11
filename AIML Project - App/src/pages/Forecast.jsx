@@ -34,7 +34,7 @@ const Forecast = () => {
     try {
       setForecastLoading(true)
       const data = await marketAPI.getProductForecast(productName, 7)
-      const formattedData = data.map(item => ({
+      const formattedData = (Array.isArray(data) ? data : []).map(item => ({
         date: new Date(item.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
         price: parseFloat(item.predicted_price.toFixed(2)),
         demand: parseFloat(item.predicted_demand.toFixed(1)),

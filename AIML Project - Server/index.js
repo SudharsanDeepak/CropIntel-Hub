@@ -200,17 +200,11 @@ app.use((req, res, next) => {
 
 app.use(express.json());
 
-const MongoStore = require('connect-mongo');
-
 app.use(
   session({
     secret: process.env.SESSION_SECRET || 'your-session-secret',
     resave: false,
     saveUninitialized: false,
-    store: MongoStore.create({
-      mongoUrl: process.env.MONGO_URI,
-      touchAfter: 24 * 3600
-    }),
     cookie: {
       maxAge: 1000 * 60 * 60 * 24 * 7
     }
@@ -344,11 +338,12 @@ app.get("/health", async (req, res) => {
 
 app.get("/api/products/latest", async (req, res) => {
   try {
-    const { limit, category, search } = req.query;
+    const { limit, category, search, district } = req.query;
     const params = {};
     if (limit) params.limit = limit;
     if (category) params.category = category;
     if (search) params.search = search;
+    if (district) params.district = district;
     const cacheKey = buildCacheKey("/products/latest", params);
     const cached = getCachedData(cacheKey);
 
@@ -373,11 +368,12 @@ app.get("/api/products/latest", async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error("Products API Error:", error.message);
-    const { limit, category, search } = req.query;
+    const { limit, category, search, district } = req.query;
     const params = {};
     if (limit) params.limit = limit;
     if (category) params.category = category;
     if (search) params.search = search;
+    if (district) params.district = district;
 
     const cacheKey = buildCacheKey("/products/latest", params);
     const cached = getCachedData(cacheKey);
@@ -397,12 +393,21 @@ app.get("/api/products/latest", async (req, res) => {
     });
   }
 });
+app.get("/api/districts", async (req, res) => {
+  try {
+    const response = await axios.get(`${ML_API}/districts`, { timeout: 10000 });
+    res.json(response.data);
+  } catch (error) {
+    res.status(502).json({ error: "Failed to fetch districts", message: error.message });
+  }
+});
 app.get("/api/products/:productName/forecast", async (req, res) => {
   try {
     const { productName } = req.params;
     const days = req.query.days || 7;
+    const district = req.query.district;
     const response = await axios.get(`${ML_API}/products/${encodeURIComponent(productName)}/forecast`, {
-      params: { days },
+      params: { days, district },
       timeout: 5000, 
     });
     res.json(response.data);
@@ -414,7 +419,8 @@ app.get("/api/products/:productName/forecast", async (req, res) => {
 app.get("/api/demand", async (req, res) => {
   try {
     const days = req.query.days || 7;
-    const params = { days };
+    const district = req.query.district;
+    const params = { days, district };
     const cacheKey = buildCacheKey("/forecast/demand", params);
     const cached = getCachedData(cacheKey);
 
@@ -440,7 +446,8 @@ app.get("/api/demand", async (req, res) => {
   } catch (error) {
     console.error("Demand API Error:", error.message);
     const days = req.query.days || 7;
-    const cacheKey = buildCacheKey("/forecast/demand", { days });
+    const district = req.query.district;
+    const cacheKey = buildCacheKey("/forecast/demand", { days, district });
     const cached = getCachedData(cacheKey);
 
     if (error?.response?.status === 429) {
@@ -458,7 +465,8 @@ app.get("/api/demand", async (req, res) => {
 app.get("/api/price", async (req, res) => {
   try {
     const days = req.query.days || 7;
-    const params = { days };
+    const district = req.query.district;
+    const params = { days, district };
     const cacheKey = buildCacheKey("/forecast/price", params);
     const cached = getCachedData(cacheKey);
 
@@ -484,7 +492,8 @@ app.get("/api/price", async (req, res) => {
   } catch (error) {
     console.error("Price API Error:", error.message);
     const days = req.query.days || 7;
-    const cacheKey = buildCacheKey("/forecast/price", { days });
+    const district = req.query.district;
+    const cacheKey = buildCacheKey("/forecast/price", { days, district });
     const cached = getCachedData(cacheKey);
 
     if (error?.response?.status === 429) {
@@ -502,8 +511,9 @@ app.get("/api/price", async (req, res) => {
 app.get("/api/stock", async (req, res) => {
   try {
     const days = req.query.days || 7;
+    const district = req.query.district;
     const response = await axios.get(`${ML_API}/analysis/stock`, {
-      params: { days },
+      params: { days, district },
       timeout: 60000, 
     });
     res.json(response.data);
@@ -518,7 +528,8 @@ app.get("/api/stock", async (req, res) => {
 });
 app.get("/api/elasticity", async (req, res) => {
   try {
-    const cacheKey = buildCacheKey("/analysis/elasticity");
+    const district = req.query.district;
+    const cacheKey = buildCacheKey("/analysis/elasticity", { district });
     const cached = getCachedData(cacheKey);
 
     if (cached) {
@@ -532,6 +543,7 @@ app.get("/api/elasticity", async (req, res) => {
     const data = await requestMLApiCoalesced({
       cacheKey,
       endpoint: "/analysis/elasticity",
+      params: { district },
       timeout: 60000,
       retries: 1,
     });
@@ -541,7 +553,8 @@ app.get("/api/elasticity", async (req, res) => {
     res.json(data);
   } catch (error) {
     console.error("Elasticity API Error:", error.message);
-    const cacheKey = buildCacheKey("/analysis/elasticity");
+    const district = req.query.district;
+    const cacheKey = buildCacheKey("/analysis/elasticity", { district });
     const cached = getCachedData(cacheKey);
 
     if (error?.response?.status === 429) {
@@ -644,8 +657,13 @@ const startServer = async () => {
       console.log(`📊 Health check: http://localhost:${PORT}/health`);
       console.log("========================================");
       
-      const { startPriceMonitoring } = require('./services/priceMonitor');
-      startPriceMonitoring();
+      const mongoose = require('mongoose');
+      if (mongoose.connection.readyState === 1) {
+        const { startPriceMonitoring } = require('./services/priceMonitor');
+        startPriceMonitoring();
+      } else {
+        console.warn('⚠️  Skipping price monitoring because MongoDB is not connected.');
+      }
       
       // Heartbeat to prove server is alive
       setInterval(() => {

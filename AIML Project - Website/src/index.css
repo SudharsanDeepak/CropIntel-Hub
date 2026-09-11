@@ -13,7 +13,14 @@
     overflow-x: hidden;
   }
   h1, h2, h3, h4, h5, h6 {
-    @apply font-bold;
+    width: 100%; /* Ensure root width is 100% */
+    min-width: 0; /* Prevent overflow */
+  }
+
+  html {
+    width: 100%; /* Ensure html width is 100% */
+    min-width: 0; /* Prevent overflow */
+    overflow-x: hidden; /* Prevent horizontal overflow */
   }
   *, *::before, *::after {
     box-sizing: border-box;
@@ -141,5 +148,16 @@
 @media (min-width: 1025px) {
   html {
     font-size: 16px;
+  }
+}
+
+@media (max-width: 1023px) {
+  .app-main {
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .app-sidebar {
+    width: min(14rem, calc(100vw - 3rem)) !important;
   }
 }

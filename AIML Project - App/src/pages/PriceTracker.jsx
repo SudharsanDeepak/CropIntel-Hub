@@ -23,7 +23,7 @@ const PriceTracker = () => {
     if (location.state?.selectedProduct && products.length > 0) {
       const product = products.find(p => p.product === location.state.selectedProduct)
       if (product) {
-        handleProductClick(product)
+        handleViewDetails(product.product)
         // Clear the navigation state
         window.history.replaceState({}, document.title)
       }
@@ -45,7 +45,7 @@ const PriceTracker = () => {
     try {
       setForecastLoading(true)
       const data = await marketAPI.getProductForecast(productName, 7)
-      setProductForecast(data)
+      setProductForecast(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error('Error fetching forecast:', error)
       setProductForecast([])
@@ -65,7 +65,7 @@ const PriceTracker = () => {
     fetchProductForecast(productName)
   }
   return (
-    <div className="flex flex-col" style={{ height: 'calc(100vh - 8rem)' }}>
+    <div className="flex min-h-[calc(100dvh-4rem)] flex-col">
       {}
       <div className="flex-shrink-0 mb-6">
         <div className="mb-6">
@@ -127,11 +127,11 @@ const PriceTracker = () => {
         </div>
       </div>
       {}
-      <div className="flex-1 overflow-y-auto -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 momentum-scroll">
+      <div className="flex-1 min-h-0 overflow-y-auto -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 momentum-scroll">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
-          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 pb-6"
+          className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4 sm:gap-6 pb-6"
         >
           {isLoading ? (
             Array(6).fill(0).map((_, i) => (
@@ -144,7 +144,7 @@ const PriceTracker = () => {
             </div>
           ) : (
             filteredProducts.map((product) => {
-              const change = ((Math.random() - 0.5) * 10).toFixed(1)
+              const change = ((product.product.length % 11) - 5).toFixed(1)
               return (
                 <motion.div
                   key={product.product}
@@ -202,10 +202,10 @@ const PriceTracker = () => {
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
               onClick={(e) => e.stopPropagation()}
-              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto"
+              className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto"
             >
               {}
-              <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-8 text-white relative">
+              <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-4 sm:px-6 py-6 sm:py-8 text-white relative">
                 <button
                   onClick={() => {
                     setSelectedProduct(null)
@@ -219,7 +219,7 @@ const PriceTracker = () => {
                 <p className="text-primary-100 mt-1">Product Details & Forecast</p>
               </div>
               {}
-              <div className="p-6">
+              <div className="p-4 sm:p-6">
                 {forecastLoading ? (
                   <div className="text-center py-12">
                     <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
@@ -228,7 +228,7 @@ const PriceTracker = () => {
                 ) : productForecast && productForecast.length > 0 ? (
                   <>
                     {}
-                    <div className="grid grid-cols-2 gap-4 mb-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
                       <div className="bg-primary-50 p-4 rounded-xl">
                         <div className="flex items-center mb-2">
                           <DollarSign className="h-5 w-5 text-primary-600 mr-2" />

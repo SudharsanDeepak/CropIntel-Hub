@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom'
 import axios from 'axios'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, AreaChart, Area, ComposedChart } from 'recharts'
 import { marketAPI } from '../services/api'
+import { useSelectedDistrict } from '../hooks/useSelectedDistrict'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const WEATHER_API_KEY = '4d8fb5b93d4af21d66a2948710284366' 
@@ -25,6 +26,7 @@ const Analytics = () => {
   const [selectedWeatherProduct, setSelectedWeatherProduct] = useState(null)
   const [hourlyForecast, setHourlyForecast] = useState([])
   const [showHourlyForecast, setShowHourlyForecast] = useState(false)
+  const [selectedDistrict] = useSelectedDistrict()
   
   // Load saved location from localStorage on mount
   useEffect(() => {
@@ -34,7 +36,7 @@ const Analytics = () => {
     } else {
       detectUserLocation()
     }
-  }, [])
+  }, [selectedDistrict])
   
   useEffect(() => {
     fetchProducts()
@@ -49,7 +51,7 @@ const Analytics = () => {
   const fetchProducts = async () => {
     try {
       setIsLoading(true)
-      const data = await marketAPI.getLatestProducts()
+      const data = await marketAPI.getLatestProducts({ district: selectedDistrict })
       setProducts(data)
       // Set first product as default for weather impact
       if (data.length > 0 && !selectedWeatherProduct) {

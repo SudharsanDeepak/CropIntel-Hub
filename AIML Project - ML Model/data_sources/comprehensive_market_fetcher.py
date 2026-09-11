@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 from pymongo import MongoClient
 import os
 from dotenv import load_dotenv
-from data_sources.mongodb_utils import replace_collection_with_batches
+from data_sources.mongodb_utils import upsert_market_history_with_batches
 from data_sources.price_catalog import (
     deterministic_price,
     deterministic_quantity,
@@ -95,7 +95,7 @@ class ComprehensiveMarketFetcher:
             "Green Grape", "Red Grape", "Black Grape", "Seedless Grape", "Cotton Candy Grape"
         ]
     
-    def fetch_agmarknet_data(self, commodity):
+    def fetch_agmarknet_data(self, commodity, state="Tamil Nadu", district=None):
         """Fetch from Agmarknet API with proper authentication"""
         if not self.agmarknet_key or self.agmarknet_key == "not_required":
             return None
@@ -106,8 +106,11 @@ class ComprehensiveMarketFetcher:
                 "api-key": self.agmarknet_key,
                 "format": "json",
                 "filters[commodity]": commodity,
-                "limit": 10
+                "filters[state]": state,
+                "limit": 100
             }
+            if district and district != "All":
+                params["filters[district]"] = district
             headers = {
                 "User-Agent": "CropIntelHub/1.0",
                 "Accept": "application/json"
@@ -185,21 +188,39 @@ class ComprehensiveMarketFetcher:
     def _parse_agmarknet_data(self, data, commodity):
         """Parse Agmarknet response"""
         records = []
-        for record in data.get("records", [])[:7]:
+        for record in data.get("records", []):
             try:
-                price = deterministic_price(commodity, 0, record.get("modal_price", 50))
-                quantity = float(record.get("arrivals", 100))
+                # Agmarknet reports prices per quintal; store prices per kg.
+                price = float(record.get("modal_price", 0)) / 100
+                if price <= 0:
+                    continue
+                raw_quantity = record.get("arrivals")
+                quantity = float(raw_quantity) if raw_quantity not in (None, "") else 0
+                raw_date = str(record.get("arrival_date", ""))
+                date = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+                for date_format in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
+                    try:
+                        date = datetime.strptime(raw_date, date_format)
+                        break
+                    except ValueError:
+                        continue
                 records.append({
-                    "date": datetime.now().replace(hour=12, minute=0, second=0, microsecond=0),
+                    "date": date,
                     "product": commodity,
                     "category": infer_category(commodity),
                     "quantity": quantity,
                     "price": price,
+                    "min_price": float(record.get("min_price", 0) or 0) / 100,
+                    "max_price": float(record.get("max_price", 0) or 0) / 100,
+                    "state": record.get("state", "Tamil Nadu"),
+                    "district": record.get("district", "Unknown"),
+                    "market": record.get("market", "Unknown"),
+                    "variety": record.get("variety", ""),
                     "unit": "kg",
                     "stock": quantity * 1.5,
                     "temperature": deterministic_weather(commodity)["temperature"],
                     "rainfall": deterministic_weather(commodity)["rainfall"],
-                    "source": "agmarknet_api",
+                    "source": "agmarknet_government",
                     "confidence": "high",
                     "seasonal": False
                 })
@@ -283,7 +304,7 @@ class ComprehensiveMarketFetcher:
         
         if all_records:
             try:
-                saved_count = replace_collection_with_batches(self.collection, all_records, batch_size=100)
+                saved_count = upsert_market_history_with_batches(self.collection, all_records, batch_size=100)
                 
                 print("\n" + "=" * 70)
                 print(f"✅ DATA UPDATE COMPLETE")

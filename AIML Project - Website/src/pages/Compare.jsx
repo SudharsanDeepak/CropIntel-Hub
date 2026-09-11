@@ -5,6 +5,7 @@ import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, L
 import { ToastContainer } from '../components/Toast'
 import { useToast } from '../hooks/useToast'
 import { marketAPI } from '../services/api'
+import { useSelectedDistrict } from '../hooks/useSelectedDistrict'
 
 const Compare = () => {
   const [products, setProducts] = useState([])
@@ -15,14 +16,15 @@ const Compare = () => {
   const [selectedCategory, setSelectedCategory] = useState('all')
   const [forecastData, setForecastData] = useState({})
   const [loadingForecasts, setLoadingForecasts] = useState(false)
+  const [selectedDistrict] = useSelectedDistrict()
   const { toasts, removeToast, warning } = useToast()
   useEffect(() => {
     fetchProducts()
-  }, [])
+  }, [selectedDistrict])
   const fetchProducts = async () => {
     try {
       setIsLoading(true)
-      const data = await marketAPI.getLatestProducts()
+      const data = await marketAPI.getLatestProducts({ district: selectedDistrict })
       setProducts(data)
     } catch (error) {
       console.error('Error fetching products:', error)
@@ -33,8 +35,8 @@ const Compare = () => {
   }
   const fetchForecast = async (productName) => {
     try {
-      const data = await marketAPI.getProductForecast(productName, 7)
-      return data
+      const data = await marketAPI.getProductForecast(productName, 7, selectedDistrict)
+      return Array.isArray(data) ? data : []
     } catch (error) {
       console.error('Error fetching forecast:', error)
       return []

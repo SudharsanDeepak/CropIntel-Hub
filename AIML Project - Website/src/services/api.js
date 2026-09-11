@@ -196,49 +196,59 @@ const getWithFallback = async (
   return requestPromise
 }
 export const marketAPI = {
-  getLatestProducts: ({ limit, category, search } = {}) => {
+  getLatestProducts: ({ limit, category, search, district } = {}) => {
     const params = {}
     if (limit) params.limit = limit
     if (category) params.category = category
     if (search) params.search = search
+    if (district) params.district = district
 
     return getWithFallback('/api/products/latest', {
       cacheKey: `products:${JSON.stringify(params)}`,
       timeout: 15000,
       fallbackValue: [],
       params,
-    })
+    }).then((data) => Array.isArray(data) ? data : [])
   },
-  getProductForecast: (productName, days = 7) =>
+  getDistricts: () => getWithFallback('/api/districts', {
+    cacheKey: 'districts',
+    timeout: 10000,
+    fallbackValue: [],
+  }),
+  getProductForecast: (productName, days = 7, district) =>
     getWithFallback(`/api/products/${encodeURIComponent(productName)}/forecast`, {
-      cacheKey: `forecast:${productName}:${days}`,
+      cacheKey: `forecast:${productName}:${days}:${district || 'all'}`,
       timeout: 15000,
       fallbackValue: [],
-      params: { days },
-    }),
-  getDemandForecast: (days = 7) => 
+      params: { days, district },
+    }).then((data) => Array.isArray(data) ? data : []),
+  getDemandForecast: (days = 7, district) =>
     getWithFallback(`/api/demand?days=${days}`, {
-      cacheKey: `demand:${days}`,
+      cacheKey: `demand:${days}:${district || 'all'}`,
       timeout: 120000,
       fallbackValue: [],
+      params: { days, district },
     }),
-  getPriceForecast: (days = 7) => 
+  getPriceForecast: (days = 7, district) =>
     getWithFallback(`/api/price?days=${days}`, {
-      cacheKey: `price:${days}`,
+      cacheKey: `price:${days}:${district || 'all'}`,
       timeout: 120000,
       fallbackValue: [],
+      params: { days, district },
     }),
-  getStockAnalysis: (days = 7) => 
+  getStockAnalysis: (days = 7, district) =>
     getWithFallback(`/api/stock?days=${days}`, {
-      cacheKey: `stock:${days}`,
+      cacheKey: `stock:${days}:${district || 'all'}`,
       timeout: 60000,
       fallbackValue: [],
+      params: { days, district },
     }),
-  getElasticity: () => 
+  getElasticity: (district) =>
     getWithFallback('/api/elasticity', {
-      cacheKey: 'elasticity',
+      cacheKey: `elasticity:${district || 'all'}`,
       timeout: 60000,
       fallbackValue: [],
+      params: { district },
     }),
   getDataSources: () => 
     getWithFallback('/api/data/sources', {

@@ -1,8 +1,9 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, TrendingUp, TrendingDown, X, Calendar, Package, DollarSign, BarChart3 } from 'lucide-react'
+import { Search, SlidersHorizontal, TrendingUp, TrendingDown, X, Calendar, DollarSign } from 'lucide-react'
 import { useState, useMemo, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { marketAPI } from '../services/api'
+import { useSelectedDistrict } from '../hooks/useSelectedDistrict'
 
 const PriceTracker = () => {
   const location = useLocation()
@@ -11,19 +12,43 @@ const PriceTracker = () => {
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedProduct, setSelectedProduct] = useState(null)
   const [selectedCategory, setSelectedCategory] = useState('all')
+  const [districts, setDistricts] = useState([])
+  const [selectedDistrict, setSelectedDistrict] = useSelectedDistrict()
   const [productForecast, setProductForecast] = useState(null)
   const [forecastLoading, setForecastLoading] = useState(false)
+  const [showMobileFilters, setShowMobileFilters] = useState(false)
   
   useEffect(() => {
-    fetchProducts()
-  }, [])
+    const loadDistricts = async () => {
+      try {
+        const availableDistricts = await marketAPI.getDistricts()
+        setDistricts(availableDistricts)
+        if (!selectedDistrict || !availableDistricts.includes(selectedDistrict)) {
+          setSelectedDistrict(availableDistricts[0] || '')
+        }
+      } catch (error) {
+        console.error('Error fetching districts:', error)
+        setDistricts([])
+      }
+    }
+
+    loadDistricts()
+  }, [selectedDistrict])
+  useEffect(() => {
+    if (selectedDistrict) {
+      fetchProducts()
+    } else {
+      setProducts([])
+      setIsLoading(false)
+    }
+  }, [selectedDistrict])
   
   // Handle product selection from navigation state
   useEffect(() => {
     if (location.state?.selectedProduct && products.length > 0) {
       const product = products.find(p => p.product === location.state.selectedProduct)
       if (product) {
-        handleProductClick(product)
+        handleViewDetails(product.product)
         // Clear the navigation state
         window.history.replaceState({}, document.title)
       }
@@ -32,7 +57,7 @@ const PriceTracker = () => {
   const fetchProducts = async () => {
     try {
       setIsLoading(true)
-      const data = await marketAPI.getLatestProducts()
+      const data = await marketAPI.getLatestProducts({ district: selectedDistrict || undefined })
       setProducts(data)
     } catch (error) {
       console.error('Error fetching products:', error)
@@ -44,7 +69,7 @@ const PriceTracker = () => {
   const fetchProductForecast = async (productName) => {
     try {
       setForecastLoading(true)
-      const data = await marketAPI.getProductForecast(productName, 7)
+      const data = await marketAPI.getProductForecast(productName, 7, selectedDistrict)
       setProductForecast(data)
     } catch (error) {
       console.error('Error fetching forecast:', error)
@@ -64,6 +89,7 @@ const PriceTracker = () => {
     setSelectedProduct(productName)
     fetchProductForecast(productName)
   }
+  const selectedProductData = products.find((product) => product.product === selectedProduct)
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 8rem)' }}>
       {}
@@ -72,62 +98,72 @@ const PriceTracker = () => {
           <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">Price Tracker</h1>
           <p className="text-sm sm:text-base text-gray-600 mt-2">Monitor real-time prices for {products.length} fruits and vegetables</p>
         </div>
-        {}
-        <div className="flex flex-col gap-4">
-          {}
-          <div className="flex-1">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search products..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="input-field pl-10"
-              />
-            </div>
-          </div>
-          {}
-          <div className="flex gap-2 overflow-x-auto scrollbar-hide pb-1">
-            <button
-              onClick={() => setSelectedCategory('all')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 tap-target ${
-                selectedCategory === 'all'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              All
-            </button>
-            <button
-              onClick={() => setSelectedCategory('fruit')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 tap-target ${
-                selectedCategory === 'fruit'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              Fruits
-            </button>
-            <button
-              onClick={() => setSelectedCategory('vegetable')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap flex-shrink-0 tap-target ${
-                selectedCategory === 'vegetable'
-                  ? 'bg-primary-600 text-white'
-                  : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-              }`}
-            >
-              Vegetables
-            </button>
-          </div>
-        </div>
-        {}
-        <div className="mt-4 text-sm text-gray-600">
-          Showing {filteredProducts.length} of {products.length} products
-        </div>
       </div>
-      {}
-      <div className="flex-1 overflow-y-auto -mx-4 px-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8 momentum-scroll">
+
+      <div className="flex-1 min-h-0 flex flex-col lg:flex-row gap-6">
+        <button
+          type="button"
+          onClick={() => setShowMobileFilters((visible) => !visible)}
+          className="lg:hidden w-full btn-secondary flex items-center justify-center gap-2"
+          aria-expanded={showMobileFilters}
+        >
+          <SlidersHorizontal className="h-4 w-4" />
+          {showMobileFilters ? 'Hide Filters' : 'Search & Filters'}
+        </button>
+
+        <aside className={`${showMobileFilters ? 'block' : 'hidden'} lg:block flex-shrink-0 lg:w-64 p-4 bg-white border border-gray-200 rounded-xl h-fit`}>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search products..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="input-field pl-10"
+            />
+          </div>
+
+          <div className="mt-5 flex flex-col gap-2">
+            {[
+              ['all', 'All'],
+              ['fruit', 'Fruits'],
+              ['vegetable', 'Vegetables']
+            ].map(([category, label]) => (
+              <button
+                key={category}
+                onClick={() => setSelectedCategory(category)}
+                className={`w-full px-4 py-2 rounded-lg font-medium text-left transition-colors tap-target ${
+                  selectedCategory === category
+                    ? 'bg-primary-600 text-white'
+                    : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <label className="block mt-5">
+            <span className="text-sm font-medium text-gray-700">Tamil Nadu district</span>
+            <select
+              value={selectedDistrict}
+              onChange={(event) => setSelectedDistrict(event.target.value)}
+              className="input-field mt-1"
+            >
+              {districts.length === 0 ? (
+                <option value="">No districts available</option>
+              ) : (
+                districts.slice().sort().map((district) => <option key={district} value={district}>{district}</option>)
+              )}
+            </select>
+          </label>
+
+          <div className="mt-5 text-sm text-gray-600">
+            Showing {filteredProducts.length} of {products.length} products
+          </div>
+        </aside>
+
+        <div className="flex-1 min-w-0 overflow-y-auto momentum-scroll">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -144,7 +180,7 @@ const PriceTracker = () => {
             </div>
           ) : (
             filteredProducts.map((product) => {
-              const change = ((Math.random() - 0.5) * 10).toFixed(1)
+              const change = ((product.product.length % 11) - 5).toFixed(1)
               return (
                 <motion.div
                   key={product.product}
@@ -167,9 +203,22 @@ const PriceTracker = () => {
                       <span className="text-gray-600">Current Price</span>
                       <span className="text-2xl font-bold text-gray-900">₹{product.price.toFixed(2)}/kg</span>
                     </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-gray-600">Demand</span>
-                      <span className="font-medium">{product.predicted_demand.toFixed(1)} units</span>
+                    {product.demand_available !== false && (
+                      <>
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="text-gray-600">Demand</span>
+                          <span className="font-medium">{product.predicted_demand.toFixed(1)} kg</span>
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          Demand source: {product.demand_location || product.district || 'Unknown location'}
+                          {product.demand_source ? ` · ${product.demand_source}` : ''}
+                        </div>
+                      </>
+                    )}
+                    <div className="text-xs text-gray-500">
+                      {product.market
+                        ? `Price source: ${product.market} · ${product.district}`
+                        : `Price source: Tamil Nadu statewide markets · shown for ${product.district}`}
                     </div>
                   </div>
                   <button 
@@ -183,6 +232,7 @@ const PriceTracker = () => {
             })
           )}
         </motion.div>
+        </div>
       </div>
       {}
       <AnimatePresence>
@@ -234,14 +284,9 @@ const PriceTracker = () => {
                           <DollarSign className="h-5 w-5 text-primary-600 mr-2" />
                           <span className="text-sm text-gray-600">Current Price</span>
                         </div>
-                        <p className="text-2xl font-bold text-gray-900">₹{productForecast[0]?.predicted_price.toFixed(2)}/kg</p>
-                      </div>
-                      <div className="bg-secondary-50 p-4 rounded-xl">
-                        <div className="flex items-center mb-2">
-                          <BarChart3 className="h-5 w-5 text-secondary-600 mr-2" />
-                          <span className="text-sm text-gray-600">Current Demand</span>
-                        </div>
-                        <p className="text-2xl font-bold text-gray-900">{productForecast[0]?.predicted_demand.toFixed(1)} units</p>
+                        <p className="text-2xl font-bold text-gray-900">
+                          ₹{(selectedProductData?.price ?? productForecast[0]?.predicted_price ?? 0).toFixed(2)}/kg
+                        </p>
                       </div>
                       <div className="bg-accent-50 p-4 rounded-xl">
                         <div className="flex items-center mb-2">
@@ -252,19 +297,10 @@ const PriceTracker = () => {
                           ₹{(productForecast.reduce((sum, f) => sum + f.predicted_price, 0) / productForecast.length).toFixed(2)}/kg
                         </p>
                       </div>
-                      <div className="bg-tertiary-50 p-4 rounded-xl">
-                        <div className="flex items-center mb-2">
-                          <Package className="h-5 w-5 text-tertiary-600 mr-2" />
-                          <span className="text-sm text-gray-600">Avg Demand</span>
-                        </div>
-                        <p className="text-2xl font-bold text-gray-900">
-                          {(productForecast.reduce((sum, f) => sum + f.predicted_demand, 0) / productForecast.length).toFixed(1)} units
-                        </p>
-                      </div>
                     </div>
                     {}
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-4">7-Day Price History</h3>
+                      <h3 className="text-lg font-bold text-gray-900 mb-4">Price History · Last 7 Available Dates</h3>
                       <div className="space-y-2">
                         {productForecast.map((forecast, index) => (
                           <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
@@ -273,7 +309,6 @@ const PriceTracker = () => {
                             </span>
                             <div className="flex items-center gap-4">
                               <span className="font-semibold text-gray-900">₹{forecast.predicted_price.toFixed(2)}/kg</span>
-                              <span className="text-sm text-gray-600">{forecast.predicted_demand.toFixed(1)} units</span>
                             </div>
                           </div>
                         ))}

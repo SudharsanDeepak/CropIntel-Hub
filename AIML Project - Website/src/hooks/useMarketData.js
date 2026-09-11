@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from 'react-query'
 import { marketAPI } from '../services/api'
 import toast from 'react-hot-toast'
+import { useSelectedDistrict } from './useSelectedDistrict'
 
 const shouldRetryQuery = (failureCount, error) => {
   const status = error?.status || error?.response?.status
@@ -13,10 +14,11 @@ const shouldRetryQuery = (failureCount, error) => {
 
 export const useMarketData = () => {
   const queryClient = useQueryClient()
+  const [district] = useSelectedDistrict()
   const useDemandForecast = (days = 7) => {
     return useQuery(
-      ['demandForecast', days],
-      () => marketAPI.getDemandForecast(days),
+      ['demandForecast', days, district],
+      () => marketAPI.getDemandForecast(days, district),
       {
         retry: shouldRetryQuery,
         staleTime: 5 * 60 * 1000, 
@@ -30,8 +32,8 @@ export const useMarketData = () => {
   }
   const usePriceForecast = (days = 7) => {
     return useQuery(
-      ['priceForecast', days],
-      () => marketAPI.getPriceForecast(days),
+      ['priceForecast', days, district],
+      () => marketAPI.getPriceForecast(days, district),
       {
         retry: shouldRetryQuery,
         staleTime: 5 * 60 * 1000, 
@@ -45,8 +47,8 @@ export const useMarketData = () => {
   }
   const useStockAnalysis = (days = 7) => {
     return useQuery(
-      ['stockAnalysis', days],
-      () => marketAPI.getStockAnalysis(days),
+      ['stockAnalysis', days, district],
+      () => marketAPI.getStockAnalysis(days, district),
       {
         retry: shouldRetryQuery,
         staleTime: 5 * 60 * 1000, 
@@ -60,8 +62,8 @@ export const useMarketData = () => {
   }
   const useElasticity = () => {
     return useQuery(
-      'elasticity',
-      () => marketAPI.getElasticity(),
+      ['elasticity', district],
+      () => marketAPI.getElasticity(district),
       {
         retry: shouldRetryQuery,
         staleTime: 5 * 60 * 1000, 

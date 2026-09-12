@@ -208,14 +208,14 @@ export const marketAPI = {
 
     return getWithFallback('/api/products/latest', {
       cacheKey: `products:${JSON.stringify(params)}`,
-      timeout: 15000,
+      timeout: 60000,
       fallbackValue: [],
       params,
     }).then((data) => Array.isArray(data) ? data : [])
   },
   getDistricts: () => getWithFallback('/api/districts', {
     cacheKey: 'districts',
-    timeout: 10000,
+    timeout: 60000,
     fallbackValue: [],
   }),
   getProductForecast: (productName, days = 7, district) =>

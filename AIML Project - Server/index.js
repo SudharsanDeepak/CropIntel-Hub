@@ -15,6 +15,7 @@ const UPSTREAM_CACHE_TTL_MS = 10 * 60 * 1000;
 const upstreamCache = new Map();
 const inFlightUpstreamRequests = new Map();
 const upstreamThrottleUntil = new Map();
+const DISTRICTS_CACHE_KEY = "/districts:{}";
 
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -395,10 +396,37 @@ app.get("/api/products/latest", async (req, res) => {
 });
 app.get("/api/districts", async (req, res) => {
   try {
-    const response = await axios.get(`${ML_API}/districts`, { timeout: 10000 });
-    res.json(response.data);
+    const cached = getCachedData(DISTRICTS_CACHE_KEY);
+    if (cached) {
+      return res.json(cached);
+    }
+
+    if (isUpstreamThrottled(DISTRICTS_CACHE_KEY)) {
+      const districts = await Sales.collection.distinct("district");
+      return res.json(districts.filter((district) => district && district !== "Unknown"));
+    }
+
+    const data = await requestMLApiCoalesced({
+      cacheKey: DISTRICTS_CACHE_KEY,
+      endpoint: "/districts",
+      timeout: 10000,
+      retries: 0,
+    });
+    upstreamThrottleUntil.delete(DISTRICTS_CACHE_KEY);
+    setCachedData(DISTRICTS_CACHE_KEY, data);
+    res.json(data);
   } catch (error) {
-    res.status(502).json({ error: "Failed to fetch districts", message: error.message });
+    console.error("Districts API Error:", error.message);
+    if (error?.response?.status === 429) {
+      setUpstreamThrottled(DISTRICTS_CACHE_KEY, error?.response?.headers?.["retry-after"]);
+    }
+
+    try {
+      const districts = await Sales.collection.distinct("district");
+      return res.json(districts.filter((district) => district && district !== "Unknown"));
+    } catch (fallbackError) {
+      return res.status(502).json({ error: "Failed to fetch districts", message: fallbackError.message });
+    }
   }
 });
 app.get("/api/products/:productName/forecast", async (req, res) => {

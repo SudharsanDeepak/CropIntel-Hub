@@ -146,7 +146,10 @@ const getWithFallback = async (
     params,
   } = {}
 ) => {
-  const requestKey = buildRequestKey(path, params)
+  const normalizedParams = Object.fromEntries(
+    Object.entries(params || {}).filter(([, value]) => value !== undefined && value !== null && value !== '')
+  )
+  const requestKey = buildRequestKey(path, normalizedParams)
 
   if (isRateLimited(requestKey) && cacheKey) {
     const cached = getCachedValue(cacheKey)
@@ -163,7 +166,7 @@ const getWithFallback = async (
 
   const requestPromise = (async () => {
     try {
-      const data = await api.get(path, { timeout, params })
+      const data = await api.get(path, { timeout, params: normalizedParams })
       if (cacheKey) {
         setCachedValue(cacheKey, data)
       }
@@ -223,14 +226,14 @@ export const marketAPI = {
       params: { days, district },
     }).then((data) => Array.isArray(data) ? data : []),
   getDemandForecast: (days = 7, district) =>
-    getWithFallback(`/api/demand?days=${days}`, {
+    getWithFallback('/api/demand', {
       cacheKey: `demand:${days}:${district || 'all'}`,
       timeout: 120000,
       fallbackValue: [],
       params: { days, district },
     }),
   getPriceForecast: (days = 7, district) =>
-    getWithFallback(`/api/price?days=${days}`, {
+    getWithFallback('/api/price', {
       cacheKey: `price:${days}:${district || 'all'}`,
       timeout: 120000,
       fallbackValue: [],

@@ -6,6 +6,7 @@ import { ToastContainer } from '../components/Toast'
 import { useToast } from '../hooks/useToast'
 import { marketAPI } from '../services/api'
 import { useSelectedDistrict } from '../hooks/useSelectedDistrict'
+import { getTamilName } from '../utils/tamilTranslations'
 
 const Compare = () => {
   const [products, setProducts] = useState([])
@@ -68,7 +69,9 @@ const Compare = () => {
   }
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
-      const matchesSearch = product.product.toLowerCase().includes(searchTerm.toLowerCase())
+      const tamil = getTamilName(product.product)
+      const query = searchTerm.toLowerCase().trim()
+      const matchesSearch = product.product.toLowerCase().includes(query) || tamil.toLowerCase().includes(query)
       const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
       const notSelected = !selectedProducts.find(p => p.product === product.product)
       return matchesSearch && matchesCategory && notSelected
@@ -149,7 +152,7 @@ const Compare = () => {
               className="flex items-center gap-2 px-4 py-2 rounded-full text-white font-medium"
               style={{ backgroundColor: productColors[index] }}
             >
-              <span>{product.product}</span>
+              <span>{product.product} {getTamilName(product.product) ? `(${getTamilName(product.product)})` : ''}</span>
               <button
                 onClick={() => removeProduct(product.product)}
                 className="hover:bg-white/20 rounded-full p-1 transition-colors"
@@ -197,7 +200,13 @@ const Compare = () => {
                 >
                   <X className="h-4 w-4 text-gray-500" />
                 </button>
-                <h3 className="text-lg font-bold text-gray-900 mb-1 pr-8">{product.product}</h3>
+                <h3 className="text-lg font-bold text-gray-900 mb-1 pr-8">
+                  {product.product} {getTamilName(product.product) && (
+                    <span className="text-sm font-semibold text-primary-700">
+                      ({getTamilName(product.product)})
+                    </span>
+                  )}
+                </h3>
                 <p className="text-sm text-gray-500 capitalize mb-4">{product.category}</p>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between p-3 bg-primary-50 rounded-lg">
@@ -388,7 +397,7 @@ const Compare = () => {
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                       <input
                         type="text"
-                        placeholder="Search products..."
+                        placeholder="Search products (English / தமிழ்)..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                         className="input-field pl-10"
@@ -450,7 +459,13 @@ const Compare = () => {
                         onClick={() => addProduct(product)}
                         className="text-left p-4 border-2 border-gray-200 rounded-xl hover:border-primary-600 hover:shadow-md transition-all"
                       >
-                        <h3 className="font-bold text-gray-900 mb-1">{product.product}</h3>
+                        <h3 className="font-bold text-gray-900 mb-1">
+                          {product.product} {getTamilName(product.product) && (
+                            <span className="text-sm font-semibold text-primary-700">
+                              ({getTamilName(product.product)})
+                            </span>
+                          )}
+                        </h3>
                         <p className="text-sm text-gray-500 capitalize mb-3">{product.category}</p>
                         <div className="flex items-center justify-between text-sm">
                           <span className="text-gray-600">Price:</span>

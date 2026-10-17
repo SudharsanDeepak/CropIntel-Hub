@@ -2,13 +2,11 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { MessageCircle, X, Send, Bot, User, TrendingUp, DollarSign, Package, Calendar } from 'lucide-react'
 import { useState, useEffect, useRef } from 'react'
 import { marketAPI } from '../services/api'
+import { getSelectedDistrict } from '../hooks/useSelectedDistrict'
 import { matchProducts } from '../utils/productMatcher'
 import { parseQuery } from '../utils/queryParser'
 import { ConversationManager } from '../utils/conversationManager'
 import { generateFallbackResponse } from '../utils/fallbackSystem'
-import { Capacitor } from '@capacitor/core'
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
 const MarketGuide = () => {
   const [isOpen, setIsOpen] = useState(false)
@@ -30,7 +28,6 @@ const MarketGuide = () => {
   const retryTimeoutRef = useRef(null)
   const isFetchingProductsRef = useRef(false)
   const isMountedRef = useRef(true)
-  const isNative = Capacitor.isNativePlatform()
 
   useEffect(() => {
     isMountedRef.current = true
@@ -63,7 +60,7 @@ const MarketGuide = () => {
     isFetchingProductsRef.current = true
 
     try {
-      const response = await marketAPI.getLatestProducts()
+      const response = await marketAPI.getLatestProducts({ district: getSelectedDistrict() })
       if (isMountedRef.current) {
         setProducts(Array.isArray(response) ? response : [])
       }
@@ -389,7 +386,7 @@ Answer the user's question accurately based on the product data above.`
             className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-96 h-full sm:h-[600px] sm:max-h-[90vh] bg-white sm:rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden"
           >
             {}
-            <div className={`bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-4 text-white flex items-center justify-between ${isNative ? 'safe-area-top' : ''}`}>
+            <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-4 text-white flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
                   <Bot className="h-6 w-6" />

@@ -36,7 +36,9 @@ export const AuthProvider = ({ children }) => {
         setUser(response.data.user)
       }
     } catch (error) {
-      console.error('Failed to fetch user:', error)
+      if (error.response?.status !== 401) {
+        console.error('Failed to fetch user:', error)
+      }
       localStorage.removeItem('token')
       localStorage.removeItem('user')
     } finally {

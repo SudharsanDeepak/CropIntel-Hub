@@ -11,8 +11,8 @@ let totalTriggered = 0;
 let lastError = null;
 
 const checkPriceAlerts = async () => {
+  const checkStartTime = new Date();
   try {
-    const checkStartTime = new Date();
     console.log(`\n🔍 [${checkStartTime.toLocaleTimeString()}] Checking price alerts...`);
     
     // Get all active alerts

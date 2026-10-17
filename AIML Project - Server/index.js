@@ -223,6 +223,8 @@ app.use('/api/auth', googleAuthRoutes);
 app.use('/api/alerts', alertRoutes);
 app.use('/api/comparisons', comparisonRoutes);
 
+app.get('/favicon.ico', (req, res) => res.status(204).end());
+
 app.get("/", (req, res) => {
   res.json({
     status: "Server is running",
@@ -442,6 +444,20 @@ app.get("/api/products/:productName/forecast", async (req, res) => {
   } catch (error) {
     console.error("Product Forecast Error:", error.message);
     res.status(500).json({ error: "Failed to fetch forecast", message: error.message });
+  }
+});
+app.get("/api/products/:productName/price-series", async (req, res) => {
+  try {
+    const { productName } = req.params;
+    const { history_days = 7, forecast_days = 7, district } = req.query;
+    const response = await axios.get(`${ML_API}/products/${encodeURIComponent(productName)}/price-series`, {
+      params: { history_days, forecast_days, ...(district ? { district } : {}) },
+      timeout: 30000,
+    });
+    res.json(response.data);
+  } catch (error) {
+    console.error("Price Series Error:", error.message);
+    res.status(mapUpstreamStatus(error)).json({ error: "Failed to fetch price series", message: error.message });
   }
 });
 app.get("/api/demand", async (req, res) => {

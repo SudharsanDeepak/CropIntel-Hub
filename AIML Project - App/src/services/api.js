@@ -1,29 +1,34 @@
-import axiosInstance from '../utils/axiosConfig'
+import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 const CACHE_PREFIX = 'cropintel_cache_v1:'
 const RATE_LIMIT_PREFIX = 'cropintel_rate_limit_v1:'
+const CACHE_TTL_MS = 2 * 60 * 1000
 const inFlightRequests = new Map()
 
-// Use the configured axios instance that handles Capacitor HTTP
-const api = axiosInstance
-
-// Response interceptor for data extraction and error handling
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  timeout: 120000, 
+  headers: {
+    'Content-Type': 'application/json',
+  },
+})
+api.interceptors.request.use(
+  (config) => {
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    // Handle case where error object might be undefined or malformed
-    if (!error) {
-      console.error('Unknown error occurred')
-      return Promise.reject(new Error('An unknown error occurred'))
-    }
-    
     if (error.code === 'ECONNABORTED') {
       console.error('Request timeout - ML API is processing large dataset')
       return Promise.reject(new Error('Request timeout. The server is processing a large dataset. Please try again.'))
     }
-    
-    const message = error.userMessage || error.response?.data?.message || error.message || 'Something went wrong'
+    const message = error.response?.data?.message || error.message || 'Something went wrong'
     const normalizedError = new Error(message)
     normalizedError.response = error.response
     normalizedError.code = error.code
@@ -37,6 +42,11 @@ const getCachedValue = (key) => {
     const raw = localStorage.getItem(`${CACHE_PREFIX}${key}`)
     if (!raw) return null
     const parsed = JSON.parse(raw)
+    const age = Date.now() - (parsed?.timestamp || 0)
+    if (!parsed?.timestamp || age > CACHE_TTL_MS) {
+      localStorage.removeItem(`${CACHE_PREFIX}${key}`)
+      return null
+    }
     return parsed?.value ?? null
   } catch {
     return null
@@ -54,6 +64,24 @@ const setCachedValue = (key, value) => {
     )
   } catch {
     // Ignore storage quota or serialization errors.
+  }
+}
+
+const clearCachedValues = (predicate = () => true) => {
+  try {
+    for (let i = localStorage.length - 1; i >= 0; i -= 1) {
+      const storageKey = localStorage.key(i)
+      if (!storageKey || !storageKey.startsWith(CACHE_PREFIX)) {
+        continue
+      }
+
+      const logicalKey = storageKey.slice(CACHE_PREFIX.length)
+      if (predicate(logicalKey)) {
+        localStorage.removeItem(storageKey)
+      }
+    }
+  } catch {
+    // Ignore storage access failures.
   }
 }
 
@@ -170,51 +198,67 @@ const getWithFallback = async (
   inFlightRequests.set(requestKey, requestPromise)
   return requestPromise
 }
-
 export const marketAPI = {
-  getLatestProducts: ({ limit, category, search } = {}) => {
+  getLatestProducts: ({ limit, category, search, district } = {}) => {
     const params = {}
     if (limit) params.limit = limit
     if (category) params.category = category
     if (search) params.search = search
+    if (district) params.district = district
 
     return getWithFallback('/api/products/latest', {
       cacheKey: `products:${JSON.stringify(params)}`,
-      timeout: 15000,
+      timeout: 60000,
       fallbackValue: [],
       params,
-    })
+    }).then((data) => Array.isArray(data) ? data : [])
   },
-  getProductForecast: (productName, days = 7) =>
+  getDistricts: () => getWithFallback('/api/districts', {
+    cacheKey: 'districts',
+    timeout: 60000,
+    fallbackValue: [],
+  }),
+  getProductForecast: (productName, days = 7, district) =>
     getWithFallback(`/api/products/${encodeURIComponent(productName)}/forecast`, {
-      cacheKey: `forecast:${productName}:${days}`,
+      cacheKey: `forecast:${productName}:${days}:${district || 'all'}`,
       timeout: 15000,
       fallbackValue: [],
-      params: { days },
+      params: { days, district },
+    }).then((data) => Array.isArray(data) ? data : []),
+  getProductPriceSeries: (productName, district) =>
+    getWithFallback(`/api/products/${encodeURIComponent(productName)}/price-series`, {
+      cacheKey: `price-series:${productName}:${district || 'all'}`,
+      timeout: 60000,
+      fallbackValue: { historical: [], forecast: [], model_inputs: {} },
+      params: { history_days: 7, forecast_days: 7, district },
     }),
-  getDemandForecast: (days = 7) => 
+  getDemandForecast: (days = 7, district) =>
     getWithFallback('/api/demand', {
-      cacheKey: `demand:${days}`,
+      cacheKey: `demand:${days}:${district || 'all'}`,
       timeout: 120000,
       fallbackValue: [],
+      params: { days, district },
     }),
-  getPriceForecast: (days = 7) => 
+  getPriceForecast: (days = 7, district) =>
     getWithFallback('/api/price', {
-      cacheKey: `price:${days}`,
+      cacheKey: `price:${days}:${district || 'all'}`,
       timeout: 120000,
       fallbackValue: [],
+      params: { days, district },
     }),
-  getStockAnalysis: (days = 7) => 
+  getStockAnalysis: (days = 7, district) =>
     getWithFallback(`/api/stock?days=${days}`, {
-      cacheKey: `stock:${days}`,
+      cacheKey: `stock:${days}:${district || 'all'}`,
       timeout: 60000,
       fallbackValue: [],
+      params: { days, district },
     }),
-  getElasticity: () => 
+  getElasticity: (district) =>
     getWithFallback('/api/elasticity', {
-      cacheKey: 'elasticity',
+      cacheKey: `elasticity:${district || 'all'}`,
       timeout: 60000,
       fallbackValue: [],
+      params: { district },
     }),
   getDataSources: () => 
     getWithFallback('/api/data/sources', {
@@ -222,8 +266,10 @@ export const marketAPI = {
       timeout: 30000,
       fallbackValue: [],
     }),
-  updateMarketData: () => 
-    api.post('/api/data/update', {}, { timeout: 180000 }), // 3 minutes timeout
+  updateMarketData: async () => {
+    const result = await api.post('/api/data/update', {}, { timeout: 180000 })
+    clearCachedValues((key) => key.startsWith('products:'))
+    return result
+  },
 }
-
 export default api

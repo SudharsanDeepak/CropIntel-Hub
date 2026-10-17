@@ -4,8 +4,21 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const OTP = require('../models/OTP');
 const { sendOTPEmail } = require('../services/emailService');
+const mongoose = require('mongoose');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
+
+const checkDbConnection = (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.status(503).json({
+      success: false,
+      message: 'Database is not connected. Please whitelist your IP address in MongoDB Atlas (Network Access -> Add IP Address -> Allow Access from Anywhere 0.0.0.0/0).'
+    });
+  }
+  next();
+};
+
+router.use(checkDbConnection);
 const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };

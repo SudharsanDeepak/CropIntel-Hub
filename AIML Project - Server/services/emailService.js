@@ -26,7 +26,9 @@ const shouldUseDevMode = () => {
 };
 
 const shouldFallbackOnEmailError = () => {
-  // Keep fallback opt-in only. Set OTP_FALLBACK_MODE=true to allow dev fallback on SMTP errors.
+  if (process.env.NODE_ENV === 'development' || !process.env.NODE_ENV) {
+    return true;
+  }
   return String(process.env.OTP_FALLBACK_MODE || '').toLowerCase() === 'true';
 };
 

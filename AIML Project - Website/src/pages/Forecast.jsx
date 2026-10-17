@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Area, AreaChart } from 'recharts'
 import { marketAPI } from '../services/api'
 import { useSelectedDistrict } from '../hooks/useSelectedDistrict'
+import { getTamilName } from '../utils/tamilTranslations'
 
 const Forecast = () => {
   const [products, setProducts] = useState([])
@@ -62,8 +63,13 @@ const Forecast = () => {
     if (forecastData.length === 0) return null
     const avgPrice = forecastData.reduce((sum, d) => sum + d.price, 0) / forecastData.length
     const avgDemand = forecastData.reduce((sum, d) => sum + d.demand, 0) / forecastData.length
-    const priceChange = ((forecastData[forecastData.length - 1].price - forecastData[0].price) / forecastData[0].price * 100).toFixed(1)
-    const demandChange = ((forecastData[forecastData.length - 1].demand - forecastData[0].demand) / forecastData[0].demand * 100).toFixed(1)
+    const firstPrice = forecastData[0].price
+    const lastPrice = forecastData[forecastData.length - 1].price
+    const priceChange = firstPrice > 0 ? (((lastPrice - firstPrice) / firstPrice) * 100).toFixed(1) : '0.0'
+
+    const firstDemand = forecastData[0].demand
+    const lastDemand = forecastData[forecastData.length - 1].demand
+    const demandChange = firstDemand > 0 ? (((lastDemand - firstDemand) / firstDemand) * 100).toFixed(1) : '0.0'
     return {
       avgPrice: avgPrice.toFixed(2),
       avgDemand: avgDemand.toFixed(1),
@@ -125,7 +131,7 @@ const Forecast = () => {
             >
               {filteredProducts.map((product) => (
                 <option key={product.product} value={product.product}>
-                  {product.product} - ₹{product.price.toFixed(2)}/kg
+                  {product.product} {getTamilName(product.product) ? `(${getTamilName(product.product)})` : ''} - ₹{product.price.toFixed(2)}/kg
                 </option>
               ))}
             </select>

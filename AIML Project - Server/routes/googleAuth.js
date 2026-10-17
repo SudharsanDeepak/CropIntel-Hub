@@ -3,6 +3,7 @@ const passport = require('passport');
 const jwt = require('jsonwebtoken');
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
+const mongoose = require('mongoose');
 const isGoogleOAuthConfigured = () => {
   return (
     process.env.GOOGLE_CLIENT_ID &&
@@ -12,6 +13,9 @@ const isGoogleOAuthConfigured = () => {
   );
 };
 router.get('/google', (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=db_disconnected`);
+  }
   if (!isGoogleOAuthConfigured()) {
     return res.status(503).json({
       success: false,
@@ -33,6 +37,9 @@ router.get('/google', (req, res, next) => {
 router.get(
   '/google/callback',
   (req, res, next) => {
+    if (mongoose.connection.readyState !== 1) {
+      return res.redirect(`${process.env.FRONTEND_URL || 'http://localhost:5173'}/login?error=db_disconnected`);
+    }
     if (!isGoogleOAuthConfigured()) {
       const redirectToApp = req.session?.redirectToApp || false
       if (redirectToApp) {

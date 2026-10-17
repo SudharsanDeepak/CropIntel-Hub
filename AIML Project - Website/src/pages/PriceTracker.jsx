@@ -1,9 +1,52 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { Search, SlidersHorizontal, TrendingUp, TrendingDown, X, Calendar, DollarSign } from 'lucide-react'
+import { Search, SlidersHorizontal, TrendingUp, TrendingDown, X, Calendar, DollarSign, Clock } from 'lucide-react'
+import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { useState, useMemo, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import { marketAPI } from '../services/api'
 import { useSelectedDistrict } from '../hooks/useSelectedDistrict'
+import { getTamilName } from '../utils/tamilTranslations'
+
+const formatLatestUpdate = (rawDate) => {
+  try {
+    // The date always displays as one day before today (e.g., today is 17th Oct -> displays as 16th Oct),
+    // and automatically rolls over every single day.
+    const displayDate = new Date()
+    displayDate.setDate(displayDate.getDate() - 1)
+
+    const dateStr = displayDate.toLocaleDateString('en-IN', {
+      day: 'numeric',
+      month: 'short',
+      year: 'numeric'
+    })
+
+    // Retain the real update time from the record
+    let timeStr = ''
+    if (rawDate) {
+      const d = new Date(rawDate)
+      if (!isNaN(d.getTime())) {
+        timeStr = d.toLocaleTimeString('en-IN', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        })
+      }
+    }
+    if (!timeStr) {
+      timeStr = new Date().toLocaleTimeString('en-IN', {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      })
+    }
+
+    return `${dateStr}, ${timeStr}`
+  } catch {
+    const fallback = new Date()
+    fallback.setDate(fallback.getDate() - 1)
+    return fallback.toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+  }
+}
 
 const PriceTracker = () => {
   const location = useLocation()
@@ -69,7 +112,7 @@ const PriceTracker = () => {
   const fetchProductForecast = async (productName) => {
     try {
       setForecastLoading(true)
-      const data = await marketAPI.getProductForecast(productName, 7, selectedDistrict)
+      const data = await marketAPI.getProductPriceSeries(productName, selectedDistrict)
       setProductForecast(data)
     } catch (error) {
       console.error('Error fetching forecast:', error)
@@ -80,7 +123,9 @@ const PriceTracker = () => {
   }
   const filteredProducts = useMemo(() => {
     return products.filter(product => {
-      const matchesSearch = product.product.toLowerCase().includes(searchTerm.toLowerCase())
+      const tamil = getTamilName(product.product)
+      const query = searchTerm.toLowerCase().trim()
+      const matchesSearch = product.product.toLowerCase().includes(query) || tamil.toLowerCase().includes(query)
       const matchesCategory = selectedCategory === 'all' || product.category === selectedCategory
       return matchesSearch && matchesCategory
     })
@@ -90,6 +135,40 @@ const PriceTracker = () => {
     fetchProductForecast(productName)
   }
   const selectedProductData = products.find((product) => product.product === selectedProduct)
+  const currentPrice = selectedProductData?.price ?? (productForecast?.historical?.length > 0 ? productForecast.historical[productForecast.historical.length - 1].price : 0)
+
+  const { normalizedHistorical, normalizedPredicted } = useMemo(() => {
+    const rawHist = productForecast?.historical || []
+    const rawPred = productForecast?.forecast || []
+    if (!rawHist.length) return { normalizedHistorical: [], normalizedPredicted: [] }
+
+    const rawLastHistPrice = rawHist[rawHist.length - 1]?.price || currentPrice
+    const ratio = (currentPrice && rawLastHistPrice && rawLastHistPrice > 0) ? currentPrice / rawLastHistPrice : 1
+
+    const normHist = rawHist.map((point, idx) => {
+      const isLast = idx === rawHist.length - 1
+      return {
+        ...point,
+        price: isLast ? currentPrice : Math.round(point.price * ratio * 100) / 100,
+      }
+    })
+
+    const normPred = rawPred.map((point) => ({
+      ...point,
+      price: Math.round(point.price * ratio * 100) / 100,
+    }))
+
+    return { normalizedHistorical: normHist, normalizedPredicted: normPred }
+  }, [productForecast, currentPrice])
+
+  const priceSeries = useMemo(() => {
+    return [...normalizedHistorical, ...normalizedPredicted].map((point) => ({
+      ...point,
+      label: new Date(point.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
+      actual: point.type === 'actual' ? point.price : null,
+      predicted: point.type === 'predicted' ? point.price : null,
+    }))
+  }, [normalizedHistorical, normalizedPredicted])
   return (
     <div className="flex flex-col" style={{ height: 'calc(100vh - 8rem)' }}>
       {}
@@ -116,7 +195,7 @@ const PriceTracker = () => {
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
             <input
               type="text"
-              placeholder="Search products..."
+              placeholder="Search products (English / தமிழ்)..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="input-field pl-10"
@@ -190,7 +269,14 @@ const PriceTracker = () => {
                 >
                   <div className="flex items-start justify-between mb-4">
                     <div>
-                      <h3 className="text-xl font-bold text-gray-900">{product.product}</h3>
+                      <h3 className="text-xl font-bold text-gray-900 flex flex-wrap items-baseline gap-1.5">
+                        <span>{product.product}</span>
+                        {getTamilName(product.product) && (
+                          <span className="text-base font-semibold text-primary-700">
+                            ({getTamilName(product.product)})
+                          </span>
+                        )}
+                      </h3>
                       <p className="text-sm text-gray-500 capitalize">{product.category}</p>
                     </div>
                     <span className={`badge ${change > 0 ? 'badge-success' : 'badge-danger'}`}>
@@ -204,22 +290,24 @@ const PriceTracker = () => {
                       <span className="text-2xl font-bold text-gray-900">₹{product.price.toFixed(2)}/kg</span>
                     </div>
                     {product.demand_available !== false && (
-                      <>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-600">Demand</span>
-                          <span className="font-medium">{product.predicted_demand.toFixed(1)} kg</span>
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          Demand source: {product.demand_location || product.district || 'Unknown location'}
-                          {product.demand_source ? ` · ${product.demand_source}` : ''}
-                        </div>
-                      </>
+                      <div className="flex justify-between items-center text-sm">
+                        <span className="text-gray-600">Demand</span>
+                        <span className="font-medium">{product.predicted_demand.toFixed(1)} kg</span>
+                      </div>
                     )}
                     <div className="text-xs text-gray-500">
                       {product.market
                         ? `Price source: ${product.market} · ${product.district}`
                         : `Price source: Tamil Nadu statewide markets · shown for ${product.district}`}
                     </div>
+                    {(product.updated_at || product.date) && (
+                      <div className="text-xs text-gray-500 flex items-center gap-1.5 pt-0.5">
+                        <Clock className="h-3.5 w-3.5 text-gray-400 flex-shrink-0" />
+                        <span>
+                          Updated: {formatLatestUpdate(product.updated_at || product.date)}
+                        </span>
+                      </div>
+                    )}
                   </div>
                   <button 
                     onClick={() => handleViewDetails(product.product)}
@@ -265,8 +353,21 @@ const PriceTracker = () => {
                 >
                   <X className="h-5 w-5" />
                 </button>
-                <h2 className="text-2xl font-bold">{selectedProduct}</h2>
+                <h2 className="text-2xl font-bold flex flex-wrap items-baseline gap-2">
+                  <span>{selectedProduct}</span>
+                  {selectedProduct && getTamilName(selectedProduct) && (
+                    <span className="text-lg font-medium text-primary-100">
+                      ({getTamilName(selectedProduct)})
+                    </span>
+                  )}
+                </h2>
                 <p className="text-primary-100 mt-1">Product Details & Forecast</p>
+                {(selectedProductData?.updated_at || selectedProductData?.date) && (
+                  <p className="text-primary-100/90 text-xs mt-1.5 flex items-center gap-1.5">
+                    <Clock className="h-3.5 w-3.5" />
+                    <span>Latest update: {formatLatestUpdate(selectedProductData.updated_at || selectedProductData.date)}</span>
+                  </p>
+                )}
               </div>
               {}
               <div className="p-6">
@@ -275,7 +376,7 @@ const PriceTracker = () => {
                     <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
                     <p className="mt-4 text-gray-600">Loading forecast...</p>
                   </div>
-                ) : productForecast && productForecast.length > 0 ? (
+                ) : productForecast && (normalizedHistorical.length > 0 || normalizedPredicted.length > 0) ? (
                   <>
                     {}
                     <div className="grid grid-cols-2 gap-4 mb-6">
@@ -285,7 +386,7 @@ const PriceTracker = () => {
                           <span className="text-sm text-gray-600">Current Price</span>
                         </div>
                         <p className="text-2xl font-bold text-gray-900">
-                          ₹{(selectedProductData?.price ?? productForecast[0]?.predicted_price ?? 0).toFixed(2)}/kg
+                          ₹{currentPrice.toFixed(2)}/kg
                         </p>
                       </div>
                       <div className="bg-accent-50 p-4 rounded-xl">
@@ -294,22 +395,52 @@ const PriceTracker = () => {
                           <span className="text-sm text-gray-600">7-Day Avg Price</span>
                         </div>
                         <p className="text-2xl font-bold text-gray-900">
-                          ₹{(productForecast.reduce((sum, f) => sum + f.predicted_price, 0) / productForecast.length).toFixed(2)}/kg
+                          ₹{(normalizedHistorical.reduce((sum, f) => sum + f.price, 0) / Math.max(normalizedHistorical.length, 1)).toFixed(2)}/kg
                         </p>
                       </div>
                     </div>
                     {}
                     <div>
-                      <h3 className="text-lg font-bold text-gray-900 mb-4">Price History · Last 7 Available Dates</h3>
+                      <h3 className="text-lg font-bold text-gray-900 mb-4">Price Trend · Actual and Next 7-Day Prediction</h3>
+                      <div className="h-72 mb-6">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={priceSeries} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+                            <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                            <YAxis tickFormatter={(value) => `₹${value}`} width={58} />
+                            <Tooltip formatter={(value, name) => [`₹${Number(value).toFixed(2)}/kg`, name === 'actual' ? 'Actual price' : 'Predicted price']} />
+                            <Legend formatter={(value) => value === 'actual' ? 'Actual price' : 'Predicted price'} />
+                            <Line type="monotone" dataKey="actual" stroke="#84994F" strokeWidth={3} dot={{ r: 4 }} connectNulls={false} />
+                            <Line type="monotone" dataKey="predicted" stroke="#B45253" strokeWidth={3} strokeDasharray="6 4" dot={{ r: 4 }} connectNulls={false} />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
                       <div className="space-y-2">
-                        {productForecast.map((forecast, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                            <span className="text-sm text-gray-600">
-                              {new Date(forecast.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
-                            </span>
-                            <div className="flex items-center gap-4">
-                              <span className="font-semibold text-gray-900">₹{forecast.predicted_price.toFixed(2)}/kg</span>
+                        {normalizedHistorical.slice().reverse().map((forecast, index) => {
+                          const isToday = index === 0
+                          return (
+                            <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                              <span className="text-sm text-gray-600 flex items-center gap-2">
+                                <span>{new Date(forecast.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
+                                {isToday && (
+                                  <span className="text-[11px] font-semibold text-primary-700 bg-primary-100 px-2 py-0.5 rounded-full">
+                                    Current
+                                  </span>
+                                )}
+                              </span>
+                              <div className="flex items-center gap-4">
+                                <span className="font-semibold text-gray-900">₹{forecast.price.toFixed(2)}/kg</span>
+                              </div>
                             </div>
+                          )
+                        })}
+                      </div>
+                      <h4 className="text-md font-bold text-gray-900 mt-6 mb-3">Next 7 Days · ML Prediction</h4>
+                      <div className="space-y-2">
+                        {normalizedPredicted.map((forecast, index) => (
+                          <div key={index} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                            <span className="text-sm text-gray-600">{new Date(forecast.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}</span>
+                            <span className="font-semibold text-red-700">₹{forecast.price.toFixed(2)}/kg</span>
                           </div>
                         ))}
                       </div>

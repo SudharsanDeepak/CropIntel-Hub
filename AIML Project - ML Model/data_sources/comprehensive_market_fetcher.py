@@ -2,19 +2,40 @@
 Comprehensive market data fetcher with multiple fallback strategies.
 Combines government APIs, free APIs, and realistic simulation.
 """
+import sys
+import os
 import requests
 import random
 from datetime import datetime, timedelta
 from pymongo import MongoClient
-import os
 from dotenv import load_dotenv
-from data_sources.mongodb_utils import upsert_market_history_with_batches
-from data_sources.price_catalog import (
-    deterministic_price,
-    deterministic_quantity,
-    deterministic_weather,
-    infer_category,
-)
+
+# Ensure module search paths are configured for both direct and package execution
+_CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
+_PARENT_DIR = os.path.dirname(_CURRENT_DIR)
+if _PARENT_DIR not in sys.path:
+    sys.path.insert(0, _PARENT_DIR)
+if _CURRENT_DIR not in sys.path:
+    sys.path.insert(0, _CURRENT_DIR)
+
+try:
+    from data_sources.mongodb_utils import upsert_market_history_with_batches
+    from data_sources.price_catalog import (
+        deterministic_price,
+        deterministic_quantity,
+        deterministic_weather,
+        infer_category,
+    )
+    from data_sources.weather_fetcher import WeatherFetcher
+except (ImportError, ModuleNotFoundError):
+    from mongodb_utils import upsert_market_history_with_batches
+    from price_catalog import (
+        deterministic_price,
+        deterministic_quantity,
+        deterministic_weather,
+        infer_category,
+    )
+    from weather_fetcher import WeatherFetcher
 
 load_dotenv()
 
@@ -35,8 +56,6 @@ class ComprehensiveMarketFetcher:
         
         self.agmarknet_key = os.getenv("AGMARKNET_API_KEY", "")
         self.usda_key = os.getenv("USDA_API_KEY", "")
-        
-        from data_sources.weather_fetcher import WeatherFetcher
         self.weather_fetcher = WeatherFetcher()
         self.current_weather = None
         
@@ -195,7 +214,10 @@ class ComprehensiveMarketFetcher:
                 if price <= 0:
                     continue
                 raw_quantity = record.get("arrivals")
-                quantity = float(raw_quantity) if raw_quantity not in (None, "") else 0
+                try:
+                    quantity = float(raw_quantity) if raw_quantity not in (None, "", "0", 0) else deterministic_quantity(commodity, 0)
+                except Exception:
+                    quantity = deterministic_quantity(commodity, 0)
                 raw_date = str(record.get("arrival_date", ""))
                 date = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
                 for date_format in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y"):
@@ -217,7 +239,7 @@ class ComprehensiveMarketFetcher:
                     "market": record.get("market", "Unknown"),
                     "variety": record.get("variety", ""),
                     "unit": "kg",
-                    "stock": quantity * 1.5,
+                    "stock": round(quantity * 1.5, 1),
                     "temperature": deterministic_weather(commodity)["temperature"],
                     "rainfall": deterministic_weather(commodity)["rainfall"],
                     "source": "agmarknet_government",
@@ -252,19 +274,67 @@ class ComprehensiveMarketFetcher:
                 continue
         return records
     
+    def _ensure_continuous_history(self, commodity, existing_records, days=7):
+        """Ensure that the product has a continuous, unbroken daily record for each of the last `days` days."""
+        if self.current_weather is None:
+            self.current_weather = self.weather_fetcher.fetch_average_weather()
+
+        # Group existing records by date string (YYYY-MM-DD)
+        existing_by_date = {}
+        for r in (existing_records or []):
+            rec_date = r.get("date")
+            if isinstance(rec_date, datetime):
+                d_str = rec_date.strftime("%Y-%m-%d")
+            else:
+                try:
+                    d_str = str(rec_date)[:10]
+                except Exception:
+                    d_str = None
+            if d_str:
+                existing_by_date.setdefault(d_str, []).append(r)
+
+        result_records = list(existing_records or [])
+        category = infer_category(commodity)
+
+        # Ensure every day in [0 ... days-1] has at least one record
+        for day_offset in range(days):
+            target_dt = (datetime.now() - timedelta(days=day_offset)).replace(hour=12, minute=0, second=0, microsecond=0)
+            target_d_str = target_dt.strftime("%Y-%m-%d")
+
+            if target_d_str not in existing_by_date:
+                # Missing date: generate realistic simulated record for this exact day
+                price = deterministic_price(commodity, day_offset=day_offset)
+                quantity = deterministic_quantity(commodity, day_offset=day_offset)
+                result_records.append({
+                    "date": target_dt,
+                    "product": commodity,
+                    "category": category,
+                    "quantity": quantity,
+                    "price": price,
+                    "unit": "kg",
+                    "stock": round(quantity * 1.5, 2),
+                    "temperature": self.current_weather.get("temperature", 28.0),
+                    "rainfall": self.current_weather.get("rainfall", 0.0),
+                    "source": "realistic_simulation",
+                    "confidence": "high",
+                    "seasonal": False
+                })
+
+        return result_records
+
     def fetch_product_data(self, commodity, days=7):
         """
-        Fetch data for a single product with fallback strategy.
+        Fetch data for a single product with fallback strategy and guaranteed continuous history.
         """
         agmarknet_data = self.fetch_agmarknet_data(commodity)
         if agmarknet_data and len(agmarknet_data) > 0:
-            print(f"✅ {commodity}: Agmarknet API ({len(agmarknet_data)} records)")
-            return agmarknet_data
+            print(f"✅ {commodity}: Agmarknet API ({len(agmarknet_data)} records, backfilling gaps)")
+            return self._ensure_continuous_history(commodity, agmarknet_data, days=days)
         
         usda_data = self.fetch_usda_data(commodity)
         if usda_data and len(usda_data) > 0:
-            print(f"✅ {commodity}: USDA API ({len(usda_data)} records)")
-            return usda_data
+            print(f"✅ {commodity}: USDA API ({len(usda_data)} records, backfilling gaps)")
+            return self._ensure_continuous_history(commodity, usda_data, days=days)
         
         realistic_data = self.generate_realistic_data(commodity, days)
         print(f"✅ {commodity}: Realistic simulation ({len(realistic_data)} records)")

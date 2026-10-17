@@ -9,6 +9,7 @@ import ConfirmModal from '../components/ConfirmModal'
 import { useConfirm } from '../hooks/useConfirm'
 import { useAuth } from '../context/AuthContext'
 import { withAuth } from '../utils/authHeaders'
+import { useSelectedDistrict } from '../hooks/useSelectedDistrict'
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
@@ -30,16 +31,17 @@ const Alerts = () => {
   })
   const [formErrors, setFormErrors] = useState({})
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [selectedDistrict] = useSelectedDistrict()
   
   useEffect(() => {
     fetchProducts()
     fetchAlerts()
-  }, [])
+  }, [selectedDistrict])
   
   const fetchProducts = async () => {
     try {
       setIsLoading(true)
-      const data = await marketAPI.getLatestProducts()
+      const data = await marketAPI.getLatestProducts({ district: selectedDistrict })
       setProducts(data)
     } catch (err) {
       console.error('Error fetching products:', err)

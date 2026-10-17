@@ -225,6 +225,13 @@ export const marketAPI = {
       fallbackValue: [],
       params: { days, district },
     }).then((data) => Array.isArray(data) ? data : []),
+  getProductPriceSeries: (productName, district) =>
+    getWithFallback(`/api/products/${encodeURIComponent(productName)}/price-series`, {
+      cacheKey: `price-series:${productName}:${district || 'all'}`,
+      timeout: 60000,
+      fallbackValue: { historical: [], forecast: [], model_inputs: {} },
+      params: { history_days: 7, forecast_days: 7, district },
+    }),
   getDemandForecast: (days = 7, district) =>
     getWithFallback('/api/demand', {
       cacheKey: `demand:${days}:${district || 'all'}`,

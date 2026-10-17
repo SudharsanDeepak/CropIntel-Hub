@@ -379,30 +379,61 @@ Answer the user's question accurately based on the product data above.`
       {}
       <AnimatePresence>
         {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 100, scale: 0.8 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 100, scale: 0.8 }}
-            className="fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-96 h-full sm:h-[600px] sm:max-h-[90vh] bg-white sm:rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden"
-          >
-            {}
-            <div className="bg-gradient-to-r from-primary-600 to-primary-700 px-6 py-4 text-white flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center">
-                  <Bot className="h-6 w-6" />
+          <>
+            {/* Mobile backdrop */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsOpen(false)}
+              className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 sm:hidden"
+              aria-hidden="true"
+            />
+
+            {/* Chatbot Window / Sheet */}
+            <motion.div
+              initial={{ opacity: 0, y: 50, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 50, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="fixed inset-x-0 bottom-0 top-12 sm:top-auto sm:inset-x-auto sm:bottom-6 sm:right-6 sm:w-96 sm:h-[600px] sm:max-h-[90vh] bg-white rounded-t-3xl sm:rounded-2xl shadow-2xl z-50 flex flex-col overflow-hidden border border-gray-200/80"
+              style={{
+                marginTop: 'env(safe-area-inset-top, 0px)'
+              }}
+            >
+              {/* Header with status bar protection */}
+              <div className="bg-gradient-to-r from-primary-600 via-primary-700 to-primary-800 text-white flex-shrink-0 shadow-sm">
+                {/* Visual pull-bar indicator for mobile sheet */}
+                <div className="pt-2 pb-0.5 sm:hidden flex justify-center">
+                  <div className="w-12 h-1.5 bg-white/35 rounded-full" />
                 </div>
-                <div>
-                  <h3 className="font-bold text-lg">Market Guide</h3>
-                  <p className="text-xs text-primary-100">Always here to help</p>
+
+                <div className="px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <div className="w-10 h-10 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm shadow-inner">
+                        <Bot className="h-6 w-6 text-white" />
+                      </div>
+                      <span className="absolute bottom-0 right-0 w-3 h-3 bg-green-400 border-2 border-primary-700 rounded-full" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-base sm:text-lg tracking-tight">Market Guide</h3>
+                      <p className="text-xs text-primary-100 flex items-center gap-1.5">
+                        <span className="inline-block w-1.5 h-1.5 bg-green-300 rounded-full animate-pulse" />
+                        AI Market Assistant
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={() => setIsOpen(false)}
+                    aria-label="Close Chatbot"
+                    className="w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 active:scale-95 flex items-center justify-center transition-all duration-150 focus:outline-none focus:ring-2 focus:ring-white/50"
+                  >
+                    <X className="h-5 w-5 text-white" />
+                  </button>
                 </div>
               </div>
-              <button
-                onClick={() => setIsOpen(false)}
-                className="p-2 hover:bg-white/20 rounded-lg transition-colors"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
             {}
             <div className="px-3 sm:px-4 py-3 bg-gray-50 border-b border-gray-200">
               <div className="flex gap-2 overflow-x-auto scrollbar-hide">
@@ -500,7 +531,8 @@ Answer the user's question accurately based on the product data above.`
               </p>
             </div>
           </motion.div>
-        )}
+        </>
+      )}
       </AnimatePresence>
     </>
   )
